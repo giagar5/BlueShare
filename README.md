@@ -42,7 +42,7 @@ uv run blueshare
 | Go to the tablet | push the cursor past the screen edge (touching it is not enough) |
 | Back to Windows | push the cursor past the tablet edge facing the PC |
 | Switch manually | `Ctrl` + `Alt` + `S`, or the tray menu |
-| Return sooner or later | tray menu › *Ritorno su Windows*: Prudente / Bilanciato / Rapido |
+| Return sooner or later | tray menu › *Ritorno su Windows*: Prudente / Bilanciato / Rapido / Aggressivo |
 | Recalibrate, forget the tablet, quit | tray menu |
 
 While you are on the tablet, Windows receives no keyboard or mouse input. Entering the tablet
@@ -84,7 +84,9 @@ unaccelerated speed, and the estimate is deliberately pessimistic: movements *aw
 that leads back to Windows count `away_factor` times. The estimate never reaches that edge before
 the real cursor does; at worst you push a little further to come back, but you are never thrown
 back to Windows from the middle of the tablet screen. The tray presets trade that safety for a
-quicker return: *Prudente* (factor 3.0, margin 5%), *Bilanciato* (2.4, 4%), *Rapido* (1.8, 3%).
+quicker return: *Prudente* (factor 3.0, margin 5%), *Bilanciato* (2.4, 4%), *Rapido* (1.8, 3%),
+*Aggressivo* (1.3, 2%). The aggressive presets can occasionally return to Windows before the
+cursor reaches the tablet edge after fast movements away from it.
 
 ## Limitations
 

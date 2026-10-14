@@ -24,6 +24,7 @@ RETURN_PRESETS = {
     "Prudente": (3.0, 0.05),
     "Bilanciato": (2.4, 0.04),
     "Rapido": (1.8, 0.03),
+    "Aggressivo": (1.3, 0.02),
 }
 
 
