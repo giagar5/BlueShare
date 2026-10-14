@@ -127,7 +127,7 @@ class PointerModel:
 class EdgePush:
     """Detects a deliberate push against a PC screen edge (not just touching it)."""
 
-    def __init__(self, threshold_counts: int, reset_s: float = 0.3) -> None:
+    def __init__(self, threshold_counts: int, reset_s: float = 0.5) -> None:
         self.threshold = threshold_counts
         self.reset_s = reset_s
         self.pushed = 0
@@ -137,8 +137,12 @@ class EdgePush:
         self.pushed = 0
 
     def feed(self, at_edge: bool, toward_edge: int, now: float) -> bool:
-        """toward_edge: movement component towards the edge (positive = pushing)."""
-        if not at_edge or toward_edge < 0 or now - self._last > self.reset_s:
+        """toward_edge: movement component towards the edge (positive = pushing).
+
+        Small movements away from the edge (mouse jitter) do not reset the count: moving away for
+        real takes the cursor off the edge, and that does.
+        """
+        if not at_edge or now - self._last > self.reset_s:
             self.pushed = 0
         self._last = now
         if at_edge and toward_edge > 0:

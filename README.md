@@ -57,7 +57,7 @@ input for a while, BlueShare also dismisses a swipe lock screen (never a PIN or 
 | --- | --- | --- |
 | `tablet_side` | `top` | where the tablet is relative to the PC screen: `top`, `bottom`, `left`, `right` |
 | `pointer_speed` | `1.0` | multiplier from mouse counts to counts sent to the tablet |
-| `entry_push_counts` | `150` | how far (raw mouse counts) you must push against the edge to switch |
+| `entry_push_counts` | `40` | how far (raw mouse counts) you must push against the edge to switch |
 | `return_margin` | `0.04` | how far past the tablet edge (fraction of its size) you must push to come back |
 | `away_factor` | `2.4` | worst-case Android pointer acceleration assumed when estimating the return (see below) |
 | `calibration_reaction_s` | `0.25` | reaction time subtracted from the calibration (the click comes after the edge is reached) |

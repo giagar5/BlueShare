@@ -19,7 +19,7 @@ CONFIG_PATH = APP_DIR / "config.json"
 class Config:
     tablet_side: str = Side.TOP.value
     pointer_speed: float = 1.0       # HID counts sent per raw mouse count
-    entry_push_counts: int = 150     # raw mouse counts pushed against the edge to switch to the tablet
+    entry_push_counts: int = 40      # raw mouse counts pushed against the edge to switch to the tablet
     return_margin: float = 0.04      # fraction of the tablet extent to push past its edge to come back
     away_factor: float = 2.4         # worst-case Android acceleration assumed for moves away from that edge
     calibration_reaction_s: float = 0.25  # typical delay between the cursor touching the edge and the click

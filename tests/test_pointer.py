@@ -103,8 +103,12 @@ def test_edge_push_requires_continuous_push():
     assert not push.feed(True, 60, now=3.0)      # too slow: restarted
 
 
-def test_edge_push_cancelled_by_moving_away():
+def test_edge_push_tolerates_jitter_but_not_leaving_the_edge():
     push = EdgePush(threshold_counts=100)
     push.feed(True, 90, now=1.0)
-    assert not push.feed(True, -1, now=1.05)
-    assert not push.feed(True, 20, now=1.1)
+    assert not push.feed(True, -1, now=1.05)     # jitter away from the edge: count kept
+    assert push.feed(True, 10, now=1.1)
+    push.reset()
+    push.feed(True, 90, now=2.0)
+    assert not push.feed(False, -5, now=2.05)    # really left the edge
+    assert not push.feed(True, 20, now=2.1)
