@@ -21,10 +21,10 @@ LOG_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "BlueShare"
 # How eagerly BlueShare returns to Windows: (away_factor, return_margin). Lower values return
 # sooner but may return early after fast moves away from the edge (Android acceleration).
 RETURN_PRESETS = {
-    "Prudente": (3.0, 0.05),
     "Bilanciato": (2.4, 0.04),
     "Rapido": (1.8, 0.03),
     "Aggressivo": (1.3, 0.02),
+    "Immediato": (1.0, 0.0),
 }
 
 

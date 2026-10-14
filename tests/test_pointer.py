@@ -48,6 +48,15 @@ def test_moves_away_from_the_return_edge_are_pessimistic():
     assert model.move(0, 1, now=1.3)
 
 
+def test_without_margin_or_pessimism_returns_right_at_the_edge():
+    model = PointerModel(CAL, Side.TOP, return_margin=0.0, away_factor=1.0)
+    model.enter(0.5)                             # y = 980
+    model.move(0, -100, now=1.0)
+    assert model.y == 880
+    assert not model.move(0, 121, now=1.1)       # 1 count past the edge: the minimum margin
+    assert model.move(0, 1, now=1.2)
+
+
 def test_moves_along_the_edge_are_not_scaled():
     model = PointerModel(CAL, Side.TOP, away_factor=3.0)
     model.enter(0.5)

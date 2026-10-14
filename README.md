@@ -42,7 +42,7 @@ uv run blueshare
 | Go to the tablet | push the cursor past the screen edge (touching it is not enough) |
 | Back to Windows | push the cursor past the tablet edge facing the PC |
 | Switch manually | `Ctrl` + `Alt` + `S`, or the tray menu |
-| Return sooner or later | tray menu › *Ritorno su Windows*: Prudente / Bilanciato / Rapido / Aggressivo |
+| Return sooner or later | tray menu › *Ritorno su Windows*: Bilanciato / Rapido / Aggressivo / Immediato |
 | Recalibrate, forget the tablet, quit | tray menu |
 
 While you are on the tablet, Windows receives no keyboard or mouse input. Entering the tablet
@@ -58,8 +58,8 @@ input for a while, BlueShare also dismisses a swipe lock screen (never a PIN or 
 | `tablet_side` | `top` | where the tablet is relative to the PC screen: `top`, `bottom`, `left`, `right` |
 | `pointer_speed` | `1.0` | multiplier from mouse counts to counts sent to the tablet |
 | `entry_push_counts` | `150` | how far (raw mouse counts) you must push against the edge to switch |
-| `return_margin` | `0.05` | how far past the tablet edge (fraction of its size) you must push to come back |
-| `away_factor` | `3.0` | worst-case Android pointer acceleration assumed when estimating the return (see below) |
+| `return_margin` | `0.04` | how far past the tablet edge (fraction of its size) you must push to come back |
+| `away_factor` | `2.4` | worst-case Android pointer acceleration assumed when estimating the return (see below) |
 | `calibration_reaction_s` | `0.25` | reaction time subtracted from the calibration (the click comes after the edge is reached) |
 | `wake_on_enter` | `true` | send a wake-up key when switching to the tablet |
 | `unlock_method` | `menu` | how to dismiss a swipe lock screen: `menu` (Menu key), `swipe` (mouse drag) or `none` |
@@ -84,9 +84,10 @@ unaccelerated speed, and the estimate is deliberately pessimistic: movements *aw
 that leads back to Windows count `away_factor` times. The estimate never reaches that edge before
 the real cursor does; at worst you push a little further to come back, but you are never thrown
 back to Windows from the middle of the tablet screen. The tray presets trade that safety for a
-quicker return: *Prudente* (factor 3.0, margin 5%), *Bilanciato* (2.4, 4%), *Rapido* (1.8, 3%),
-*Aggressivo* (1.3, 2%). The aggressive presets can occasionally return to Windows before the
-cursor reaches the tablet edge after fast movements away from it.
+quicker return: *Bilanciato* (factor 2.4, margin 4%, the default), *Rapido* (1.8, 3%),
+*Aggressivo* (1.3, 2%) and *Immediato* (1.0, no margin: returns as soon as the estimate reaches the
+edge). The faster presets can return to Windows before the cursor reaches the tablet edge after
+fast movements away from it.
 
 ## Limitations
 

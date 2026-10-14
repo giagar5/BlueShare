@@ -54,7 +54,7 @@ class Clock:
 @pytest.fixture
 def env():
     config = Config(calibration_width=2000, calibration_height=1000, entry_push_counts=150, return_margin=0.1,
-                    unlock_method="none", calibration_reaction_s=0.0)
+                    away_factor=3.0, unlock_method="none", calibration_reaction_s=0.0)
     link, screen, notes, saves = FakeLink(), FakeScreen(), [], []
     ctl = Controller(config, link, screen, notify=notes.append, save_config=lambda: saves.append(1), clock=Clock())
     ctl.spawn = lambda target: None  # tests drive the calibration sweep by hand
