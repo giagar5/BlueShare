@@ -42,6 +42,7 @@ uv run blueshare
 | Go to the tablet | push the cursor past the screen edge (touching it is not enough) |
 | Back to Windows | push the cursor past the tablet edge facing the PC |
 | Switch manually | `Ctrl` + `Alt` + `S`, or the tray menu |
+| Go to the tablet more or less easily | tray menu › *Passaggio al tablet*: Normale / Facile / Immediato |
 | Return sooner or later | tray menu › *Ritorno su Windows*: Bilanciato / Rapido / Aggressivo / Immediato |
 | Recalibrate, forget the tablet, quit | tray menu |
 
@@ -57,7 +58,7 @@ input for a while, BlueShare also dismisses a swipe lock screen (never a PIN or 
 | --- | --- | --- |
 | `tablet_side` | `top` | where the tablet is relative to the PC screen: `top`, `bottom`, `left`, `right` |
 | `pointer_speed` | `1.0` | multiplier from mouse counts to counts sent to the tablet |
-| `entry_push_counts` | `40` | how far (raw mouse counts) you must push against the edge to switch |
+| `entry_push_counts` | `15` | how far (raw mouse counts) you must push against the edge to switch (*Normale* 40, *Facile* 15, *Immediato* 1) |
 | `return_margin` | `0.04` | how far past the tablet edge (fraction of its size) you must push to come back |
 | `away_factor` | `2.4` | worst-case Android pointer acceleration assumed when estimating the return (see below) |
 | `calibration_reaction_s` | `0.25` | reaction time subtracted from the calibration (the click comes after the edge is reached) |

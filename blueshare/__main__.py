@@ -11,7 +11,7 @@ from pathlib import Path
 from . import __version__
 from .config import APP_DIR, CONFIG_PATH, Config
 from .controller import Controller, Mode
-from .tray import Tray
+from .tray import PresetMenu, Tray
 from .winput import InputThread, WindowsScreen, acquire_single_instance, enable_dpi_awareness
 
 log = logging.getLogger("blueshare")
@@ -25,6 +25,13 @@ RETURN_PRESETS = {
     "Rapido": (1.8, 0.03),
     "Aggressivo": (1.3, 0.02),
     "Immediato": (1.0, 0.0),
+}
+
+# How far you push past the PC screen edge to switch to the tablet (raw mouse counts).
+ENTRY_PRESETS = {
+    "Normale": 40,
+    "Facile": 15,
+    "Immediato": 1,
 }
 
 
@@ -91,18 +98,29 @@ def main() -> int:
     tray.on_toggle = controller.toggle
     tray.on_calibrate = controller.start_calibration
     tray.on_forget = forget
-    tray.return_presets = list(RETURN_PRESETS)
-    tray.current_preset = lambda: next(
-        (name for name, (factor, margin) in RETURN_PRESETS.items()
-         if factor == config.away_factor and margin == config.return_margin), "")
 
-    def set_preset(name: str) -> None:
+    def set_entry(name: str) -> None:
+        config.entry_push_counts = ENTRY_PRESETS[name]
+        controller.edge.threshold = config.entry_push_counts
+        save_config()
+        log.info("Entry preset: %s", name)
+        tray.refresh()
+
+    def set_return(name: str) -> None:
         config.away_factor, config.return_margin = RETURN_PRESETS[name]
         save_config()
         log.info("Return preset: %s", name)
         tray.refresh()
 
-    tray.on_preset = set_preset
+    tray.preset_menus = [
+        PresetMenu("Passaggio al tablet", list(ENTRY_PRESETS),
+                   lambda: next((n for n, v in ENTRY_PRESETS.items() if v == config.entry_push_counts), ""),
+                   set_entry),
+        PresetMenu("Ritorno su Windows", list(RETURN_PRESETS),
+                   lambda: next((n for n, v in RETURN_PRESETS.items()
+                                 if v == (config.away_factor, config.return_margin)), ""),
+                   set_return),
+    ]
     controller.on_state_change = tray.refresh
 
     started = []
