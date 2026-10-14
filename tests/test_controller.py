@@ -54,7 +54,7 @@ class Clock:
 @pytest.fixture
 def env():
     config = Config(calibration_width=2000, calibration_height=1000, entry_push_counts=150, return_margin=0.1,
-                    unlock_method="none")
+                    unlock_method="none", calibration_reaction_s=0.0)
     link, screen, notes, saves = FakeLink(), FakeScreen(), [], []
     ctl = Controller(config, link, screen, notify=notes.append, save_config=lambda: saves.append(1), clock=Clock())
     ctl.spawn = lambda target: None  # tests drive the calibration sweep by hand
@@ -199,6 +199,20 @@ def test_early_click_during_calibration_is_ignored(env):
     ctl.start_calibration()
     ctl.on_raw_mouse(raw(flags=RI_MOUSE_LEFT_DOWN))
     assert ctl.cal_phase == 1 and ctl.mode is Mode.CALIBRATING
+
+
+def test_calibration_discounts_the_reaction_time(env):
+    ctl, link, screen, *_ = env
+    ctl.config.calibration_reaction_s = 0.25
+    now = [0.0]
+    ctl.clock = lambda: now[0]
+    ctl.start_calibration()
+    steps = 1000
+    for _ in range(steps):
+        ctl._sweep_step()
+    now[0] = steps * SWEEP_STEP / 200                 # swept at 200 counts/s
+    ctl._calibration_mark()
+    assert ctl.cal_height == steps * SWEEP_STEP - 50  # 0.25 s at 200 counts/s
 
 
 def test_unlock_menu_key_is_sent_only_after_idle(env):

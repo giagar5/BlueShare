@@ -57,8 +57,9 @@ input for a while, BlueShare also dismisses a swipe lock screen (never a PIN or 
 | `tablet_side` | `top` | where the tablet is relative to the PC screen: `top`, `bottom`, `left`, `right` |
 | `pointer_speed` | `1.0` | multiplier from mouse counts to counts sent to the tablet |
 | `entry_push_counts` | `150` | how far (raw mouse counts) you must push against the edge to switch |
-| `return_margin` | `0.1` | how far past the tablet edge (fraction of its size) you must push to come back |
+| `return_margin` | `0.05` | how far past the tablet edge (fraction of its size) you must push to come back |
 | `away_factor` | `3.0` | worst-case Android pointer acceleration assumed when estimating the return (see below) |
+| `calibration_reaction_s` | `0.25` | reaction time subtracted from the calibration (the click comes after the edge is reached) |
 | `wake_on_enter` | `true` | send a wake-up key when switching to the tablet |
 | `unlock_method` | `menu` | how to dismiss a swipe lock screen: `menu` (Menu key), `swipe` (mouse drag) or `none` |
 | `unlock_after_idle_s` | `30` | only unlock if the tablet received no input for this many seconds |

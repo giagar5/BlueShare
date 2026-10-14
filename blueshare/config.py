@@ -20,8 +20,9 @@ class Config:
     tablet_side: str = Side.TOP.value
     pointer_speed: float = 1.0       # HID counts sent per raw mouse count
     entry_push_counts: int = 150     # raw mouse counts pushed against the edge to switch to the tablet
-    return_margin: float = 0.1       # fraction of the tablet extent to push past its edge to come back
+    return_margin: float = 0.05      # fraction of the tablet extent to push past its edge to come back
     away_factor: float = 3.0         # worst-case Android acceleration assumed for moves away from that edge
+    calibration_reaction_s: float = 0.25  # typical delay between the cursor touching the edge and the click
     wake_on_enter: bool = True
     unlock_method: str = "menu"      # dismiss a swipe lock screen on entry: "menu", "swipe" or "none"
     unlock_after_idle_s: float = 30  # only unlock if the tablet received no input for this long

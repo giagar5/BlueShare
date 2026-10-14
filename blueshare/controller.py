@@ -97,6 +97,7 @@ class Controller:
         self.cal_phase = 0            # 1 = sweeping down, 2 = sweeping right
         self.cal_counts = 0
         self.cal_height = 0
+        self._cal_t0 = 0.0
         self._sweep_gen = 0
         self.spawn: Callable[[Callable[[], None]], None] = (
             lambda target: threading.Thread(target=target, name="blueshare-calibration", daemon=True).start())
@@ -234,20 +235,29 @@ class Controller:
                 self.link.move(0, SWEEP_STEP)
             else:
                 self.link.move(SWEEP_STEP, 0)
+            if self.cal_counts == 0:
+                self._cal_t0 = self.clock()
             self.cal_counts += SWEEP_STEP
             return True
 
+    def _measured_counts(self) -> int:
+        """Counts swept until the click, minus the user's reaction time at the measured sweep speed."""
+        elapsed = self.clock() - self._cal_t0
+        rate = self.cal_counts / elapsed if elapsed > 0 else 0.0
+        late = round(self.config.calibration_reaction_s * rate)
+        return max(MIN_CALIBRATION_COUNTS, self.cal_counts - late)
+
     def _calibration_mark(self) -> None:
         if self.cal_phase == 1:
-            self.cal_height = self.cal_counts
-            if self.cal_height < MIN_CALIBRATION_COUNTS:
+            if self.cal_counts < MIN_CALIBRATION_COUNTS:
                 return  # clicked before the sweep started moving: ignore
+            self.cal_height = self._measured_counts()
             self.cal_phase, self.cal_counts = 2, 0
             self.link.move_exact(-PIN_COUNTS, 0, SETTLE_S)  # bottom-left corner
             self.notify("Calibrazione 2/2: ora il cursore va verso destra. "
                         "Fai clic (o premi Invio) appena tocca il bordo destro.")
         elif self.cal_phase == 2 and self.cal_counts >= MIN_CALIBRATION_COUNTS:
-            self._finish_calibration(self.cal_counts, self.cal_height)
+            self._finish_calibration(self._measured_counts(), self.cal_height)
 
     def _finish_calibration(self, width: int, height: int) -> None:
         self.cal_phase = 0
