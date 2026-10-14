@@ -29,8 +29,20 @@ class Tray:
         self.on_toggle: Callable[[], None] = lambda: None
         self.on_calibrate: Callable[[], None] = lambda: None
         self.on_forget: Callable[[], None] = lambda: None
+        self.return_presets: list[str] = []
+        self.current_preset: Callable[[], str] = lambda: ""
+        self.on_preset: Callable[[str], None] = lambda name: None
         self.settings_dir = ""
         self.icon = pystray.Icon("BlueShare", _icon_image("offline"), title, menu=self._menu())
+
+    def _preset_item(self, index: int) -> pystray.MenuItem:
+        return pystray.MenuItem(
+            lambda _: self.return_presets[index] if index < len(self.return_presets) else "",
+            lambda: self.on_preset(self.return_presets[index]),
+            checked=lambda _: index < len(self.return_presets) and self.current_preset() == self.return_presets[index],
+            radio=True,
+            visible=lambda _: index < len(self.return_presets),
+        )
 
     def _menu(self) -> pystray.Menu:
         item = pystray.MenuItem
@@ -40,6 +52,7 @@ class Tray:
             item(lambda _: "Torna al PC" if self.status()[2] else "Passa al tablet",
                  lambda: self.on_toggle(), default=True),
             item("Calibra...", lambda: self.on_calibrate()),
+            item("Ritorno su Windows", pystray.Menu(*(self._preset_item(i) for i in range(3)))),
             item("Dimentica il tablet abbinato", lambda: self.on_forget()),
             item("Apri cartella impostazioni", lambda: os.startfile(self.settings_dir)),
             pystray.Menu.SEPARATOR,

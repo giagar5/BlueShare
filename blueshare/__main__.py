@@ -18,6 +18,14 @@ log = logging.getLogger("blueshare")
 
 LOG_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "BlueShare"
 
+# How eagerly BlueShare returns to Windows: (away_factor, return_margin). Lower values return
+# sooner but may return early after fast moves away from the edge (Android acceleration).
+RETURN_PRESETS = {
+    "Prudente": (3.0, 0.05),
+    "Bilanciato": (2.4, 0.04),
+    "Rapido": (1.8, 0.03),
+}
+
 
 def _setup_logging() -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -82,6 +90,18 @@ def main() -> int:
     tray.on_toggle = controller.toggle
     tray.on_calibrate = controller.start_calibration
     tray.on_forget = forget
+    tray.return_presets = list(RETURN_PRESETS)
+    tray.current_preset = lambda: next(
+        (name for name, (factor, margin) in RETURN_PRESETS.items()
+         if factor == config.away_factor and margin == config.return_margin), "")
+
+    def set_preset(name: str) -> None:
+        config.away_factor, config.return_margin = RETURN_PRESETS[name]
+        save_config()
+        log.info("Return preset: %s", name)
+        tray.refresh()
+
+    tray.on_preset = set_preset
     controller.on_state_change = tray.refresh
 
     started = []

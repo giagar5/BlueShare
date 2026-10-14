@@ -42,6 +42,7 @@ uv run blueshare
 | Go to the tablet | push the cursor past the screen edge (touching it is not enough) |
 | Back to Windows | push the cursor past the tablet edge facing the PC |
 | Switch manually | `Ctrl` + `Alt` + `S`, or the tray menu |
+| Return sooner or later | tray menu › *Ritorno su Windows*: Prudente / Bilanciato / Rapido |
 | Recalibrate, forget the tablet, quit | tray menu |
 
 While you are on the tablet, Windows receives no keyboard or mouse input. Entering the tablet
@@ -82,7 +83,8 @@ counts do not map linearly to pixels. The calibration therefore measures the scr
 unaccelerated speed, and the estimate is deliberately pessimistic: movements *away* from the edge
 that leads back to Windows count `away_factor` times. The estimate never reaches that edge before
 the real cursor does; at worst you push a little further to come back, but you are never thrown
-back to Windows from the middle of the tablet screen.
+back to Windows from the middle of the tablet screen. The tray presets trade that safety for a
+quicker return: *Prudente* (factor 3.0, margin 5%), *Bilanciato* (2.4, 4%), *Rapido* (1.8, 3%).
 
 ## Limitations
 
