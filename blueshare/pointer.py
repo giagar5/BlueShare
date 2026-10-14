@@ -55,6 +55,11 @@ class PointerModel:
     def margin_counts(self) -> int:
         return max(1, round(self.return_margin * self._return_extent))
 
+    @property
+    def lead_counts(self) -> int:
+        """With a negative margin: how far before the edge the return already triggers."""
+        return max(0, round(-self.return_margin * self._return_extent))
+
     def enter(self, fraction: float) -> list[tuple[int, int, float]]:
         """Place the cursor just inside the edge facing the PC.
 
@@ -114,6 +119,16 @@ class PointerModel:
         }[self.side]
         self.x = min(w, max(0, nx))
         self.y = min(h, max(0, ny))
+
+        lead = self.lead_counts
+        if lead:
+            toward, distance = {
+                Side.TOP: (dy, h - self.y),
+                Side.BOTTOM: (-dy, self.y),
+                Side.LEFT: (dx, w - self.x),
+                Side.RIGHT: (-dx, self.x),
+            }[self.side]
+            return toward > 0 and distance <= lead
 
         if beyond > 0:
             keep = at_edge and now - self._last_push <= self.overshoot_reset_s

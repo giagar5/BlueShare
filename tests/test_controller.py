@@ -82,6 +82,17 @@ def test_push_against_top_edge_switches_to_tablet(env):
     assert link.of("exact") == [("exact", -PIN_COUNTS, PIN_COUNTS), ("exact", fraction_x, -20)]
 
 
+def test_entry_zone_switches_just_before_the_edge(env):
+    ctl, link, screen, *_ = env
+    ctl.config.entry_push_counts = ctl.edge.threshold = 1
+    screen.pos = (480, 5)
+    ctl.on_raw_mouse(raw(dy=-1))
+    assert ctl.mode is Mode.LOCAL                     # no zone: 5 px from the edge is not enough
+    ctl.config.entry_zone_px = 6
+    ctl.on_raw_mouse(raw(dy=-1))
+    assert ctl.mode is Mode.REMOTE
+
+
 def test_touching_the_edge_or_dragging_does_not_switch(env):
     ctl, link, screen, *_ = env
     screen.pos = (480, 0)

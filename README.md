@@ -42,8 +42,8 @@ uv run blueshare
 | Go to the tablet | push the cursor past the screen edge (touching it is not enough) |
 | Back to Windows | push the cursor past the tablet edge facing the PC |
 | Switch manually | `Ctrl` + `Alt` + `S`, or the tray menu |
-| Go to the tablet more or less easily | tray menu › *Passaggio al tablet*: Normale / Facile / Immediato |
-| Return sooner or later | tray menu › *Ritorno su Windows*: Bilanciato / Rapido / Aggressivo / Immediato |
+| Go to the tablet more or less easily | tray menu › *Passaggio al tablet* |
+| Return sooner or later | tray menu › *Ritorno su Windows* |
 | Recalibrate, forget the tablet, quit | tray menu |
 
 While you are on the tablet, Windows receives no keyboard or mouse input. Entering the tablet
@@ -58,8 +58,9 @@ input for a while, BlueShare also dismisses a swipe lock screen (never a PIN or 
 | --- | --- | --- |
 | `tablet_side` | `top` | where the tablet is relative to the PC screen: `top`, `bottom`, `left`, `right` |
 | `pointer_speed` | `1.0` | multiplier from mouse counts to counts sent to the tablet |
-| `entry_push_counts` | `15` | how far (raw mouse counts) you must push against the edge to switch (*Normale* 40, *Facile* 15, *Immediato* 1) |
-| `return_margin` | `0.04` | how far past the tablet edge (fraction of its size) you must push to come back |
+| `entry_push_counts` | `15` | how far (raw mouse counts) you must push against the edge to switch |
+| `entry_zone_px` | `0` | if > 0, the push already counts this many pixels before the edge |
+| `return_margin` | `0.04` | how far past the tablet edge (fraction of its size) you must push to come back; negative = come back that far *before* the edge |
 | `away_factor` | `2.4` | worst-case Android pointer acceleration assumed when estimating the return (see below) |
 | `calibration_reaction_s` | `0.25` | reaction time subtracted from the calibration (the click comes after the edge is reached) |
 | `wake_on_enter` | `true` | send a wake-up key when switching to the tablet |
@@ -84,11 +85,20 @@ counts do not map linearly to pixels. The calibration therefore measures the scr
 unaccelerated speed, and the estimate is deliberately pessimistic: movements *away* from the edge
 that leads back to Windows count `away_factor` times. The estimate never reaches that edge before
 the real cursor does; at worst you push a little further to come back, but you are never thrown
-back to Windows from the middle of the tablet screen. The tray presets trade that safety for a
-quicker return: *Bilanciato* (factor 2.4, margin 4%, the default), *Rapido* (1.8, 3%),
-*Aggressivo* (1.3, 2%) and *Immediato* (1.0, no margin: returns as soon as the estimate reaches the
-edge). The faster presets can return to Windows before the cursor reaches the tablet edge after
-fast movements away from it.
+back to Windows from the middle of the tablet screen.
+
+Both directions can be tuned from the tray menu with the same five levels:
+
+| Level | *Passaggio al tablet* | *Ritorno su Windows* |
+| --- | --- | --- |
+| Bilanciato | push 40 counts past the edge | factor 2.4, push 4% past the edge |
+| Rapido | push 15 counts (default) | factor 1.8, push 3% |
+| Aggressivo | push 5 counts | factor 1.3, push 2% |
+| Immediato | any push at the edge | factor 1.0, as soon as the estimate reaches the edge |
+| Anticipato | any move towards the edge within 6 px of it | factor 1.0, 3% before the edge when heading there |
+
+The eager levels switch with less effort but more often by accident; the return ones can come
+back before the cursor reaches the tablet edge after fast movements away from it.
 
 ## Limitations
 

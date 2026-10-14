@@ -281,14 +281,15 @@ class Controller:
         if mon is None:
             return
         side = self.config.side
+        zone = max(0, self.config.entry_zone_px)  # > 0: switch slightly before reaching the edge
         if side is Side.TOP:
-            at_edge, toward = y <= mon.top and self.screen.monitor_at(x, mon.top - 1) is None, -dy
+            at_edge, toward = y <= mon.top + zone and self.screen.monitor_at(x, mon.top - 1) is None, -dy
         elif side is Side.BOTTOM:
-            at_edge, toward = y >= mon.bottom - 1 and self.screen.monitor_at(x, mon.bottom) is None, dy
+            at_edge, toward = y >= mon.bottom - 1 - zone and self.screen.monitor_at(x, mon.bottom) is None, dy
         elif side is Side.LEFT:
-            at_edge, toward = x <= mon.left and self.screen.monitor_at(mon.left - 1, y) is None, -dx
+            at_edge, toward = x <= mon.left + zone and self.screen.monitor_at(mon.left - 1, y) is None, -dx
         else:
-            at_edge, toward = x >= mon.right - 1 and self.screen.monitor_at(mon.right, y) is None, dx
+            at_edge, toward = x >= mon.right - 1 - zone and self.screen.monitor_at(mon.right, y) is None, dx
         if self.edge.feed(at_edge, toward, self.clock()):
             self.edge.reset()
             self._enter(self._fraction_on(mon, x, y), mon)

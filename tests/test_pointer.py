@@ -57,6 +57,15 @@ def test_without_margin_or_pessimism_returns_right_at_the_edge():
     assert model.move(0, 1, now=1.2)
 
 
+def test_negative_margin_returns_before_the_edge_only_when_heading_there():
+    model = PointerModel(CAL, Side.TOP, return_margin=-0.03, away_factor=1.0)  # lead: 30 counts
+    model.enter(0.5)                             # y = 980, 20 from the edge
+    assert not model.move(-50, 0, now=1.0)       # moving along the edge
+    assert not model.move(0, -100, now=1.1)      # y = 880
+    assert not model.move(0, 60, now=1.2)        # y = 940: 60 from the edge
+    assert model.move(0, 31, now=1.3)            # y = 971: within 30 and moving down
+
+
 def test_moves_along_the_edge_are_not_scaled():
     model = PointerModel(CAL, Side.TOP, away_factor=3.0)
     model.enter(0.5)

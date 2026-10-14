@@ -18,20 +18,24 @@ log = logging.getLogger("blueshare")
 
 LOG_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "BlueShare"
 
-# How eagerly BlueShare returns to Windows: (away_factor, return_margin). Lower values return
-# sooner but may return early after fast moves away from the edge (Android acceleration).
+# Same level names for both directions, from the most deliberate to the most eager.
+# Ritorno su Windows: (away_factor, return_margin). Lower values return sooner but may return early
+# after fast moves away from the edge (Android acceleration); a negative margin returns before the edge.
 RETURN_PRESETS = {
     "Bilanciato": (2.4, 0.04),
     "Rapido": (1.8, 0.03),
     "Aggressivo": (1.3, 0.02),
     "Immediato": (1.0, 0.0),
+    "Anticipato": (1.0, -0.03),
 }
 
-# How far you push past the PC screen edge to switch to the tablet (raw mouse counts).
+# Passaggio al tablet: (push past the PC screen edge in raw mouse counts, zone before the edge in px).
 ENTRY_PRESETS = {
-    "Normale": 40,
-    "Facile": 15,
-    "Immediato": 1,
+    "Bilanciato": (40, 0),
+    "Rapido": (15, 0),
+    "Aggressivo": (5, 0),
+    "Immediato": (1, 0),
+    "Anticipato": (1, 6),
 }
 
 
@@ -100,7 +104,7 @@ def main() -> int:
     tray.on_forget = forget
 
     def set_entry(name: str) -> None:
-        config.entry_push_counts = ENTRY_PRESETS[name]
+        config.entry_push_counts, config.entry_zone_px = ENTRY_PRESETS[name]
         controller.edge.threshold = config.entry_push_counts
         save_config()
         log.info("Entry preset: %s", name)
@@ -114,7 +118,8 @@ def main() -> int:
 
     tray.preset_menus = [
         PresetMenu("Passaggio al tablet", list(ENTRY_PRESETS),
-                   lambda: next((n for n, v in ENTRY_PRESETS.items() if v == config.entry_push_counts), ""),
+                   lambda: next((n for n, v in ENTRY_PRESETS.items()
+                                 if v == (config.entry_push_counts, config.entry_zone_px)), ""),
                    set_entry),
         PresetMenu("Ritorno su Windows", list(RETURN_PRESETS),
                    lambda: next((n for n, v in RETURN_PRESETS.items()
