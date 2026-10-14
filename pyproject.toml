@@ -1,0 +1,31 @@
+[project]
+name = "blueshare"
+version = "0.1.0"
+description = "Use your Windows PC keyboard and mouse on an Android tablet over Bluetooth, switching at the screen edge."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.12"
+dependencies = [
+    "pystray>=0.19.5",
+    "pillow>=10",
+    "winrt-runtime>=3.2",
+    "winrt-Windows.Foundation>=3.2",
+    "winrt-Windows.Foundation.Collections>=3.2",
+    "winrt-Windows.Devices.Bluetooth>=3.2",
+    "winrt-Windows.Devices.Bluetooth.GenericAttributeProfile>=3.2",
+    "winrt-Windows.Devices.Enumeration>=3.2",
+    "winrt-Windows.Storage.Streams>=3.2",
+]
+
+[project.gui-scripts]
+blueshare = "blueshare.__main__:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

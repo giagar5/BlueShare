@@ -1,0 +1,10 @@
+BlueShare
+Copyright 2026 BlueShare contributors
+
+This product is derived from InputShare (https://github.com/InputShare/InputShare),
+Copyright BHznJNs, licensed under the Apache License, Version 2.0.
+
+BlueShare reuses InputShare's approach (edge switching between the PC and an Android
+device, HID keyboard/mouse report descriptors) and replaces its ADB/scrcpy transport
+with a Bluetooth HID-over-GATT peripheral published by Windows, so no USB debugging
+is required on the tablet. All code in this repository was rewritten for that design.
