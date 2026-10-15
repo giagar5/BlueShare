@@ -8,7 +8,7 @@ import uuid
 from collections import deque
 from typing import Callable
 
-from winrt.windows.devices.bluetooth import BluetoothError
+from winrt.windows.devices.bluetooth import BluetoothConnectionStatus, BluetoothError, BluetoothLEDevice
 from winrt.windows.devices.bluetooth.genericattributeprofile import (
     GattCharacteristicProperties as Props,
     GattLocalCharacteristicParameters,
@@ -25,6 +25,8 @@ from . import hid
 log = logging.getLogger(__name__)
 
 HID_SERVICE = 0x1812
+WATCHDOG_INTERVAL_S = 1.0
+ADVERTISING_OK = ("STARTED", "STARTED_WITHOUT_ALL_ADVERTISEMENT_DATA")
 REPORT_REFERENCE = 0x2908
 INPUT_REPORT, OUTPUT_REPORT = 1, 2
 
@@ -73,7 +75,9 @@ class BleHidDevice:
         self._wake = asyncio.Event()
         self._buttons = 0
         self._connected = False
+        self._link_up = False
         self._sender: asyncio.Future | None = None
+        self._watchdog_task: asyncio.Future | None = None
 
     # ---- lifecycle -------------------------------------------------------------------------
 
@@ -81,13 +85,15 @@ class BleHidDevice:
         self._thread.start()
         asyncio.run_coroutine_threadsafe(self._publish(), self._loop).result(timeout)
         self._sender = asyncio.run_coroutine_threadsafe(self._send_loop(), self._loop)
+        self._watchdog_task = asyncio.run_coroutine_threadsafe(self._watchdog(), self._loop)
 
     def stop(self) -> None:
         async def shutdown():
-            if self._provider is not None and self._provider.advertisement_status.name == "STARTED":
+            if self._provider is not None and self._provider.advertisement_status.name in ADVERTISING_OK:
                 self._provider.stop_advertising()
-            if self._sender:
-                self._sender.cancel()
+            for task in (self._sender, self._watchdog_task):
+                if task:
+                    task.cancel()
         try:
             asyncio.run_coroutine_threadsafe(shutdown(), self._loop).result(5)
         except Exception:
@@ -223,9 +229,45 @@ class BleHidDevice:
                 log.warning("Ignoring untrusted host %s", other)
         self._update_connection()
 
+    async def _watchdog(self) -> None:
+        """Tracks the real link state of the trusted tablet and keeps advertising alive.
+
+        Windows does not always report an unsubscription when the tablet drops the link (standby,
+        Bluetooth toggled off), which would leave BlueShare forwarding input into the void. And the
+        tablet can only reconnect while the PC is advertising.
+        """
+        device, device_id, not_advertising = None, None, 0
+        while True:
+            try:
+                if self.trusted_host_id != device_id:
+                    device_id, device = self.trusted_host_id, None
+                    if device_id:
+                        device = await BluetoothLEDevice.from_id_async(device_id)
+                link_up = device is not None and device.connection_status == BluetoothConnectionStatus.CONNECTED
+                if link_up != self._link_up:
+                    self._link_up = link_up
+                    log.info("Bluetooth link to the tablet is %s", "up" if link_up else "down")
+                    self._update_connection()
+
+                status = self._provider.advertisement_status.name if self._provider is not None else "STARTED"
+                not_advertising = 0 if status in ADVERTISING_OK else not_advertising + 1
+                if not_advertising >= 2:  # ignore transient states right after (re)starting
+                    log.info("Advertising is %s: restarting it", status)
+                    not_advertising = 0
+                    self._start_advertising()
+            except Exception:
+                log.exception("Bluetooth watchdog failed")
+            await asyncio.sleep(WATCHDOG_INTERVAL_S)
+
+    def _start_advertising(self) -> None:
+        params = GattServiceProviderAdvertisingParameters()
+        params.is_connectable = True
+        params.is_discoverable = True
+        self._provider.start_advertising_with_parameters(params)
+
     def _update_connection(self) -> None:
         mouse = self._chars.get("mouse_input")
-        connected = mouse is not None and self._trusted_subscriber(mouse) is not None
+        connected = self._link_up and mouse is not None and self._trusted_subscriber(mouse) is not None
         if connected == self._connected:
             return
         self._connected = connected
@@ -261,10 +303,7 @@ class BleHidDevice:
 
         self._tokens.append(self._provider.add_advertisement_status_changed(
             lambda s, a: log.info("Advertising: %s (%s)", a.status.name, BluetoothError(a.error).name)))
-        params = GattServiceProviderAdvertisingParameters()
-        params.is_connectable = True
-        params.is_discoverable = True
-        self._provider.start_advertising_with_parameters(params)
+        self._start_advertising()
 
     async def _add(self, service, name, short_uuid, props, value, protection, static=False, report_ref=None):
         params = GattLocalCharacteristicParameters()
