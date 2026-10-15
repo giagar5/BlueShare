@@ -3,14 +3,15 @@
 Coordinates are in HID counts. The tablet clamps its cursor at the screen borders, and the
 model mirrors that. The calibration measures the screen size in counts at a slow, unaccelerated
 speed, i.e. at the minimum gain. Android may accelerate faster movements, so the model is
-pessimistic on the axis that leads back to the PC: movements away from the return edge are
-multiplied by ``away_factor`` (the worst-case acceleration), movements towards it are not. The
-estimate therefore never reaches the return edge before the real cursor does.
+pessimistic towards every exit edge: movements away from that edge are multiplied by
+``away_factor`` (the worst-case acceleration), movements towards it are not. The estimate
+therefore never reaches an exit edge before the real cursor does. Exit edges are the one facing
+the PC (return) and, optionally, the two side edges leading to the monitors next to the PC screen.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, IntEnum
 
 PIN_COUNTS = 32767  # one HID report this large drives the cursor into a corner
 SETTLE_S = 0.15     # pause after a pin so Android's velocity tracker forgets it (no acceleration)
@@ -33,6 +34,53 @@ class Calibration:
         return self.width > 0 and self.height > 0
 
 
+class Exit(IntEnum):
+    """Where, if anywhere, a move took the cursor off the tablet (falsy when it stayed)."""
+    NONE = 0
+    RETURN = 1   # through the edge facing the PC
+    BEFORE = 2   # through the left edge (tablet above/below the PC) or the top edge (tablet beside it)
+    AFTER = 3    # through the right edge, or the bottom edge
+
+
+class _SideEdge:
+    """Pessimistic 1-D estimate towards one side edge, with the same push/lead rules as the return.
+
+    Each side edge needs its own estimate: being pessimistic for the left edge means counting
+    rightward moves ``factor`` times, the opposite of what the right edge needs.
+    """
+
+    def __init__(self, extent: int, positive: bool, factor: float, margin_frac: float, reset_s: float) -> None:
+        self.extent = extent
+        self.positive = positive  # True: the edge is at `extent`, False: at 0
+        self.factor = factor
+        self.margin = max(1, round(margin_frac * extent))
+        self.lead = max(0, round(-margin_frac * extent))
+        self.reset_s = reset_s
+        self.pos = 0.0
+        self.overshoot = 0.0
+        self._last = 0.0
+
+    def distance(self) -> float:
+        return self.extent - self.pos if self.positive else self.pos
+
+    def move(self, delta: float, now: float) -> bool:
+        toward = delta if self.positive else -delta
+        if toward < 0:
+            toward *= self.factor
+        at_edge = self.distance() <= 0
+        beyond = toward - self.distance()
+        self.pos = min(self.extent, max(0.0, self.pos + (toward if self.positive else -toward)))
+        if self.lead:
+            return toward > 0 and self.distance() <= self.lead
+        if beyond > 0:
+            keep = at_edge and now - self._last <= self.reset_s
+            self.overshoot = (self.overshoot if keep else 0) + beyond
+            self._last = now
+        elif beyond < 0 or not at_edge:
+            self.overshoot = 0
+        return self.overshoot > self.margin
+
+
 class PointerModel:
     def __init__(self, calibration: Calibration, side: Side, return_margin: float = 0.1,
                  away_factor: float = 3.0, overshoot_reset_s: float = 0.4, entry_inset: float = 0.02) -> None:
@@ -46,6 +94,24 @@ class PointerModel:
         self.y = 0.0
         self.overshoot = 0.0
         self._last_push = 0.0
+        # side exits (to the monitors next to the PC screen): off unless the controller enables them
+        self.exit_before = False
+        self.exit_after = False
+        cross = calibration.width if self.side in (Side.TOP, Side.BOTTOM) else calibration.height
+        args = (self.away_factor, return_margin, overshoot_reset_s)
+        self._before = _SideEdge(cross, False, *args)
+        self._after = _SideEdge(cross, True, *args)
+
+    @property
+    def _cross(self) -> float:
+        return self.x if self.side in (Side.TOP, Side.BOTTOM) else self.y
+
+    def place(self, x: float, y: float) -> None:
+        """Sets the known cursor position (e.g. after pinning it into a corner)."""
+        self.x, self.y = x, y
+        self.overshoot = 0.0
+        for edge in (self._before, self._after):
+            edge.pos, edge.overshoot = self._cross, 0.0
 
     @property
     def _return_extent(self) -> int:
@@ -85,6 +151,7 @@ class PointerModel:
             inset = max(1, round(self.entry_inset * w))
             self.x, self.y = inset, round(fraction * h)
             pin, along = (-PIN_COUNTS, -PIN_COUNTS), (inset, round(self.y))
+        self.place(self.x, self.y)
         return [(*pin, SETTLE_S), (*along, SETTLE_S)]
 
     def fraction_along_edge(self) -> float:
@@ -100,8 +167,20 @@ class PointerModel:
             dx *= f
         return dx, dy
 
-    def move(self, dx: int, dy: int, now: float) -> bool:
-        """Apply a move; returns True when the user pushed past the PC-facing edge by the margin."""
+    def move(self, dx: int, dy: int, now: float) -> Exit:
+        """Apply a move; reports whether the user pushed past an exit edge by the margin."""
+        cross_delta = dx if self.side in (Side.TOP, Side.BOTTOM) else dy
+        out_before = self._before.move(cross_delta, now)
+        out_after = self._after.move(cross_delta, now)
+        if self._return_move(dx, dy, now):
+            return Exit.RETURN
+        if self.exit_before and out_before:
+            return Exit.BEFORE
+        if self.exit_after and out_after:
+            return Exit.AFTER
+        return Exit.NONE
+
+    def _return_move(self, dx: int, dy: int, now: float) -> bool:
         w, h = self.cal.width, self.cal.height
         ex, ey = self._pessimistic(dx, dy)
         nx, ny = self.x + ex, self.y + ey

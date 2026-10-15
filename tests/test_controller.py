@@ -34,12 +34,13 @@ class FakeLink:
 class FakeScreen:
     def __init__(self):
         self.pos = (960, 500)
+        self.monitors = [MON]
 
     def cursor_pos(self): return self.pos
     def set_cursor_pos(self, x, y): self.pos = (x, y)
     def primary_monitor(self): return MON
     def monitor_at(self, x, y):
-        return MON if MON.left <= x < MON.right and MON.top <= y < MON.bottom else None
+        return next((m for m in self.monitors if m.left <= x < m.right and m.top <= y < m.bottom), None)
 
 
 class Clock:
@@ -263,3 +264,44 @@ def test_disconnect_while_remote_returns_to_pc(env):
     link.connected = False
     ctl.on_connection_change(False)
     assert ctl.mode is Mode.LOCAL
+
+
+LEFT_MON = Rect(-1920, 0, 0, 1080)
+RIGHT_MON = Rect(1920, 200, 3840, 1280)  # offset vertically: found by probing along the edge
+
+
+def test_pushing_past_a_tablet_side_goes_to_the_monitor_on_that_side(env):
+    ctl, link, screen, *_ = env
+    screen.monitors = [MON, LEFT_MON, RIGHT_MON]
+    push_up(ctl, screen)                              # enters at x = 500 of 2000, y = 980 of 1000
+    assert ctl.side_monitors == (LEFT_MON, RIGHT_MON)
+    ctl.on_raw_mouse(raw(dx=-500))                    # reaches the left edge of the tablet
+    ctl.on_raw_mouse(raw(dx=-200))                    # within the margin (10% of 2000)
+    assert ctl.mode is Mode.REMOTE
+    ctl.on_raw_mouse(raw(dx=-1))
+    assert ctl.mode is Mode.LOCAL and ctl.entry_monitor == LEFT_MON
+    assert screen.pos == (LEFT_MON.right - 1 - RETURN_GAP_PX, round(0.98 * 1079))
+    assert ("release",) in link.calls
+
+
+def test_right_side_exit_lands_on_the_left_edge_of_the_right_monitor(env):
+    ctl, link, screen, *_ = env
+    screen.monitors = [MON, LEFT_MON, RIGHT_MON]
+    push_up(ctl, screen)
+    ctl.on_raw_mouse(raw(dx=1500))
+    ctl.on_raw_mouse(raw(dx=201))
+    assert ctl.mode is Mode.LOCAL and ctl.entry_monitor == RIGHT_MON
+    assert screen.pos == (RIGHT_MON.left + RETURN_GAP_PX, RIGHT_MON.top + round(0.98 * 1079))
+
+
+def test_side_edges_without_a_monitor_or_disabled_do_nothing(env):
+    ctl, link, screen, *_ = env
+    push_up(ctl, screen)                              # single monitor
+    ctl.on_raw_mouse(raw(dx=-5000))
+    assert ctl.mode is Mode.REMOTE
+    ctl.toggle()
+    screen.monitors = [MON, LEFT_MON]
+    ctl.config.side_exits = False
+    push_up(ctl, screen)
+    ctl.on_raw_mouse(raw(dx=-5000))
+    assert ctl.mode is Mode.REMOTE

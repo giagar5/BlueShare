@@ -9,7 +9,7 @@ from typing import Callable, Protocol
 
 from . import hid, keymap
 from .config import Config
-from .pointer import PIN_COUNTS, SETTLE_S, EdgePush, PointerModel, Side
+from .pointer import PIN_COUNTS, SETTLE_S, EdgePush, Exit, PointerModel, Side
 from .winput import (
     LLKHF_EXTENDED, LLKHF_INJECTED, LLMHF_INJECTED,
     RI_MOUSE_BUTTON4_DOWN, RI_MOUSE_BUTTON4_UP, RI_MOUSE_BUTTON5_DOWN, RI_MOUSE_BUTTON5_UP,
@@ -81,6 +81,7 @@ class Controller:
         self.edge = EdgePush(config.entry_push_counts)
         self.model: PointerModel | None = None
         self.entry_monitor: Rect | None = None
+        self.side_monitors: tuple[Rect | None, Rect | None] = (None, None)
         self.keyboard = hid.KeyboardState()
 
         self.phys_buttons = 0        # physical mouse buttons currently held
@@ -126,9 +127,13 @@ class Controller:
             self.link.set_buttons(self.phys_buttons & ~self.ignored_buttons)
             self.link.move(cx, cy, wheel, hwheel)
             self._last_remote_input = self.clock()
-            if self.model is not None and self.model.move(cx, cy, self.clock()):
+            exit = self.model.move(cx, cy, self.clock()) if self.model is not None else Exit.NONE
+            if exit is Exit.RETURN:
                 log.info("Pushed past the tablet edge: back to the PC")
                 self._go_local()
+            elif exit:
+                log.info("Pushed past the tablet side edge: to the monitor on that side")
+                self._go_local(exit)
 
     def on_key(self, vk: int, scan: int, flags: int, down: bool) -> bool:
         if flags & LLKHF_INJECTED:
@@ -263,9 +268,10 @@ class Controller:
         self.cal_phase = 0
         self.config.calibration_width, self.config.calibration_height = width, height
         self.save_config()
-        self.model = self._new_model()
-        self.model.x, self.model.y = width, height  # the tablet cursor sits in the bottom-right corner
-        self._switch(Mode.REMOTE, self.entry_monitor or self.screen.primary_monitor())
+        mon = self.entry_monitor or self.screen.primary_monitor()
+        self.model = self._new_model(mon)
+        self.model.place(width, height)  # the tablet cursor sits in the bottom-right corner
+        self._switch(Mode.REMOTE, mon)
         self.notify(f"Calibrazione salvata ({width} x {height}). Per tornare al PC spingi oltre il bordo.")
         log.info("Calibration saved: %d x %d counts", width, height)
         self._changed()
@@ -306,7 +312,7 @@ class Controller:
         if not cal.is_valid():
             self.start_calibration(mon)
             return
-        self.model = self._new_model()
+        self.model = self._new_model(mon)
         self._switch(Mode.REMOTE, mon)
         self._wake_and_unlock()
         for dx, dy, settle in self.model.enter(fraction):
@@ -314,26 +320,63 @@ class Controller:
         log.info("Switched to the tablet at %.2f along the edge", fraction)
         self._changed()
 
-    def _go_local(self) -> None:
+    def _go_local(self, exit: Exit = Exit.RETURN) -> None:
+        """Back to Windows: below the tablet (return edge) or onto the monitor on the exit side."""
         mon = self.entry_monitor or self.screen.primary_monitor()
-        fraction = self.model.fraction_along_edge() if self.mode is Mode.REMOTE and self.model else 0.5
+        model = self.model if self.mode is Mode.REMOTE else None
+        target = None
+        if exit in (Exit.BEFORE, Exit.AFTER) and model is not None:
+            target = self.side_monitors[0 if exit is Exit.BEFORE else 1]
         self.link.release_all()
         self.swallow_keys |= self.forwarded_keys
-        self._switch(Mode.LOCAL, mon)
         side = self.config.side
-        if side in (Side.TOP, Side.BOTTOM):
-            x = mon.left + round(fraction * (mon.width - 1))
-            y = mon.top + RETURN_GAP_PX if side is Side.TOP else mon.bottom - 1 - RETURN_GAP_PX
+        if target is None:
+            fraction = model.fraction_along_edge() if model else 0.5
+            self._switch(Mode.LOCAL, mon)
+            if side in (Side.TOP, Side.BOTTOM):
+                x = mon.left + round(fraction * (mon.width - 1))
+                y = mon.top + RETURN_GAP_PX if side is Side.TOP else mon.bottom - 1 - RETURN_GAP_PX
+            else:
+                y = mon.top + round(fraction * (mon.height - 1))
+                x = mon.left + RETURN_GAP_PX if side is Side.LEFT else mon.right - 1 - RETURN_GAP_PX
+            log.info("Switched back to the PC")
         else:
-            y = mon.top + round(fraction * (mon.height - 1))
-            x = mon.left + RETURN_GAP_PX if side is Side.LEFT else mon.right - 1 - RETURN_GAP_PX
+            self._switch(Mode.LOCAL, target)
+            if side in (Side.TOP, Side.BOTTOM):  # monitors left/right of the PC screen
+                fy = model.y / model.cal.height
+                y = target.top + round(fy * (target.height - 1))
+                x = target.right - 1 - RETURN_GAP_PX if exit is Exit.BEFORE else target.left + RETURN_GAP_PX
+            else:  # monitors above/below the PC screen
+                fx = model.x / model.cal.width
+                x = target.left + round(fx * (target.width - 1))
+                y = target.bottom - 1 - RETURN_GAP_PX if exit is Exit.BEFORE else target.top + RETURN_GAP_PX
+            log.info("Switched to the %s monitor", "first side" if exit is Exit.BEFORE else "second side")
         self.screen.set_cursor_pos(x, y)
-        log.info("Switched back to the PC")
         self._changed()
 
-    def _new_model(self) -> PointerModel:
-        return PointerModel(self.config.calibration, self.config.side, self.config.return_margin,
-                            away_factor=self.config.away_factor)
+    def _new_model(self, mon: Rect) -> PointerModel:
+        model = PointerModel(self.config.calibration, self.config.side, self.config.return_margin,
+                             away_factor=self.config.away_factor)
+        self.side_monitors = self._side_monitors(mon)
+        model.exit_before = self.side_monitors[0] is not None
+        model.exit_after = self.side_monitors[1] is not None
+        return model
+
+    def _side_monitors(self, mon: Rect) -> tuple[Rect | None, Rect | None]:
+        """Monitors touching the PC screen on the tablet's two side edges (left/right if the
+        tablet is above or below the screen, above/below if it is beside it)."""
+        if not self.config.side_exits:
+            return None, None
+        steps = [i / 8 for i in range(9)]
+
+        def first(points) -> Rect | None:
+            return next((m for x, y in points if (m := self.screen.monitor_at(x, y)) is not None), None)
+
+        if self.config.side in (Side.TOP, Side.BOTTOM):
+            ys = [mon.top + round(f * (mon.height - 1)) for f in steps]
+            return first((mon.left - 1, y) for y in ys), first((mon.right, y) for y in ys)
+        xs = [mon.left + round(f * (mon.width - 1)) for f in steps]
+        return first((x, mon.top - 1) for x in xs), first((x, mon.bottom) for x in xs)
 
     def _switch(self, mode: Mode, mon: Rect) -> None:
         self.mode = mode

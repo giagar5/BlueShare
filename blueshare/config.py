@@ -26,6 +26,7 @@ class Config:
     away_factor: float = 2.4         # worst-case Android acceleration assumed for moves away from that edge
     calibration_reaction_s: float = 0.25  # typical delay between the cursor touching the edge and the click
     wake_on_enter: bool = True
+    side_exits: bool = True          # leaving the tablet by a side edge goes to the monitor on that side
     unlock_method: str = "menu"      # dismiss a swipe lock screen on entry: "menu", "swipe" or "none"
     unlock_after_idle_s: float = 30  # only unlock if the tablet received no input for this long
     calibration_width: int = 0

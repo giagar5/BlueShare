@@ -41,6 +41,7 @@ uv run blueshare
 | --- | --- |
 | Go to the tablet | push the cursor past the screen edge (touching it is not enough) |
 | Back to Windows | push the cursor past the tablet edge facing the PC |
+| Straight to a side monitor | push past the tablet's left/right edge: the cursor lands on the monitor on that side of the PC screen |
 | Switch manually | `Ctrl` + `Alt` + `S`, or the tray menu |
 | Go to the tablet more or less easily | tray menu › *Passaggio al tablet* |
 | Return sooner or later | tray menu › *Ritorno su Windows* |
@@ -64,6 +65,7 @@ input for a while, BlueShare also dismisses a swipe lock screen (never a PIN or 
 | `away_factor` | `2.4` | worst-case Android pointer acceleration assumed when estimating the return (see below) |
 | `calibration_reaction_s` | `0.25` | reaction time subtracted from the calibration (the click comes after the edge is reached) |
 | `wake_on_enter` | `true` | send a wake-up key when switching to the tablet |
+| `side_exits` | `true` | leaving the tablet by a side edge goes to the monitor on that side of the PC screen (if there is one) |
 | `unlock_method` | `menu` | how to dismiss a swipe lock screen: `menu` (Menu key), `swipe` (mouse drag) or `none` |
 | `unlock_after_idle_s` | `30` | only unlock if the tablet received no input for this many seconds |
 
@@ -78,7 +80,10 @@ Logs: `%LOCALAPPDATA%\BlueShare\blueshare.log`.
   blocks an event).
 - `pointer.py` mirrors the tablet cursor: on entry it pins the cursor into a corner and moves it to
   the matching point of the edge (with pauses, so Android does not accelerate those jumps), then
-  follows the counts it sends, clamping at the borders like Android does.
+  follows the counts it sends, clamping at the borders like Android does. It keeps a separate
+  pessimistic estimate for each exit edge: the one facing the PC and the two side edges.
+- `ble.py` also watches the real Bluetooth link to the tablet: Windows does not always notice when
+  the tablet drops the connection, and BlueShare would otherwise forward input into the void.
 
 Android accelerates fast mouse movements and many devices have no setting to turn that off, so
 counts do not map linearly to pixels. The calibration therefore measures the screen at a slow,

@@ -1,6 +1,6 @@
 import pytest
 
-from blueshare.pointer import PIN_COUNTS, SETTLE_S, Calibration, EdgePush, PointerModel, Side
+from blueshare.pointer import PIN_COUNTS, SETTLE_S, Calibration, EdgePush, Exit, PointerModel, Side
 
 CAL = Calibration(width=2000, height=1000)
 
@@ -64,6 +64,17 @@ def test_negative_margin_returns_before_the_edge_only_when_heading_there():
     assert not model.move(0, -100, now=1.1)      # y = 880
     assert not model.move(0, 60, now=1.2)        # y = 940: 60 from the edge
     assert model.move(0, 31, now=1.3)            # y = 971: within 30 and moving down
+
+
+def test_side_exit_needs_the_margin_and_is_pessimistic():
+    model = PointerModel(CAL, Side.TOP, return_margin=0.1, away_factor=3.0)  # side margin: 200
+    model.exit_before = True
+    model.enter(0.5)                             # x = 1000
+    model.move(100, 0, now=1.0)                  # for the left edge this counts 300: estimate 1300
+    assert model.move(-1300, 0, now=1.1) is Exit.NONE    # reaches the left edge
+    assert model.move(-200, 0, now=1.2) is Exit.NONE     # within the margin
+    assert model.move(-1, 0, now=1.3) is Exit.BEFORE
+    assert model.move(5000, 0, now=1.4) is Exit.NONE     # right exit not enabled
 
 
 def test_moves_along_the_edge_are_not_scaled():
