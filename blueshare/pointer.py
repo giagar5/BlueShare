@@ -83,7 +83,8 @@ class _SideEdge:
 
 class PointerModel:
     def __init__(self, calibration: Calibration, side: Side, return_margin: float = 0.1,
-                 away_factor: float = 3.0, overshoot_reset_s: float = 0.4, entry_inset: float = 0.02) -> None:
+                 away_factor: float = 3.0, overshoot_reset_s: float = 0.4, entry_inset: float = 0.02,
+                 side_margin: float | None = None, side_away_factor: float | None = None) -> None:
         self.cal = calibration
         self.side = Side(side)
         self.return_margin = return_margin
@@ -98,7 +99,8 @@ class PointerModel:
         self.exit_before = False
         self.exit_after = False
         cross = calibration.width if self.side in (Side.TOP, Side.BOTTOM) else calibration.height
-        args = (self.away_factor, return_margin, overshoot_reset_s)
+        args = (max(1.0, self.away_factor if side_away_factor is None else side_away_factor),
+                return_margin if side_margin is None else side_margin, overshoot_reset_s)
         self._before = _SideEdge(cross, False, *args)
         self._after = _SideEdge(cross, True, *args)
 

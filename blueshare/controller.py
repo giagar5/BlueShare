@@ -356,7 +356,8 @@ class Controller:
 
     def _new_model(self, mon: Rect) -> PointerModel:
         model = PointerModel(self.config.calibration, self.config.side, self.config.return_margin,
-                             away_factor=self.config.away_factor)
+                             away_factor=self.config.away_factor, side_margin=self.config.side_margin,
+                             side_away_factor=self.config.side_away_factor)
         self.side_monitors = self._side_monitors(mon)
         model.exit_before = self.side_monitors[0] is not None
         model.exit_after = self.side_monitors[1] is not None

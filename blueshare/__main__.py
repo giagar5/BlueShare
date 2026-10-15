@@ -38,6 +38,9 @@ ENTRY_PRESETS = {
     "Anticipato": (1, 6),
 }
 
+# Passaggio ai monitor laterali: same levels as the return (applied to the tablet's side edges), or off.
+SIDE_OFF = "Disattivato"
+
 
 def _setup_logging() -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -116,6 +119,19 @@ def main() -> int:
         log.info("Return preset: %s", name)
         tray.refresh()
 
+    def set_side(name: str) -> None:
+        config.side_exits = name != SIDE_OFF
+        if config.side_exits:
+            config.side_away_factor, config.side_margin = RETURN_PRESETS[name]
+        save_config()
+        log.info("Side preset: %s", name)
+        tray.refresh()
+
+    def current_side() -> str:
+        if not config.side_exits:
+            return SIDE_OFF
+        return next((n for n, v in RETURN_PRESETS.items() if v == (config.side_away_factor, config.side_margin)), "")
+
     tray.preset_menus = [
         PresetMenu("Passaggio al tablet", list(ENTRY_PRESETS),
                    lambda: next((n for n, v in ENTRY_PRESETS.items()
@@ -125,6 +141,7 @@ def main() -> int:
                    lambda: next((n for n, v in RETURN_PRESETS.items()
                                  if v == (config.away_factor, config.return_margin)), ""),
                    set_return),
+        PresetMenu("Passaggio ai monitor laterali", [*RETURN_PRESETS, SIDE_OFF], current_side, set_side),
     ]
     controller.on_state_change = tray.refresh
 

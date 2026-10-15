@@ -41,7 +41,7 @@ uv run blueshare
 | --- | --- |
 | Go to the tablet | push the cursor past the screen edge (touching it is not enough) |
 | Back to Windows | push the cursor past the tablet edge facing the PC |
-| Straight to a side monitor | push past the tablet's left/right edge: the cursor lands on the monitor on that side of the PC screen |
+| Straight to a side monitor | push past the tablet's left/right edge: the cursor lands on the monitor on that side of the PC screen; tune or turn off in tray menu › *Passaggio ai monitor laterali* |
 | Switch manually | `Ctrl` + `Alt` + `S`, or the tray menu |
 | Go to the tablet more or less easily | tray menu › *Passaggio al tablet* |
 | Return sooner or later | tray menu › *Ritorno su Windows* |
@@ -66,6 +66,7 @@ input for a while, BlueShare also dismisses a swipe lock screen (never a PIN or 
 | `calibration_reaction_s` | `0.25` | reaction time subtracted from the calibration (the click comes after the edge is reached) |
 | `wake_on_enter` | `true` | send a wake-up key when switching to the tablet |
 | `side_exits` | `true` | leaving the tablet by a side edge goes to the monitor on that side of the PC screen (if there is one) |
+| `side_away_factor`, `side_margin` | `2.4`, `0.04` | like `away_factor` and `return_margin`, for the side edges |
 | `unlock_method` | `menu` | how to dismiss a swipe lock screen: `menu` (Menu key), `swipe` (mouse drag) or `none` |
 | `unlock_after_idle_s` | `30` | only unlock if the tablet received no input for this many seconds |
 
@@ -103,7 +104,9 @@ Both directions can be tuned from the tray menu with the same five levels:
 | Anticipato | any move towards the edge within 6 px of it | factor 1.0, 3% before the edge when heading there |
 
 The eager levels switch with less effort but more often by accident; the return ones can come
-back before the cursor reaches the tablet edge after fast movements away from it.
+back before the cursor reaches the tablet edge after fast movements away from it. The side edges
+(*Passaggio ai monitor laterali*) offer the same levels with the *Ritorno su Windows* values, plus
+*Disattivato*.
 
 ## Limitations
 

@@ -77,6 +77,17 @@ def test_side_exit_needs_the_margin_and_is_pessimistic():
     assert model.move(5000, 0, now=1.4) is Exit.NONE     # right exit not enabled
 
 
+def test_side_edges_have_their_own_settings():
+    model = PointerModel(CAL, Side.TOP, return_margin=0.1, away_factor=3.0,
+                         side_margin=0.0, side_away_factor=1.0)       # side: no margin, no pessimism
+    model.exit_after = True
+    model.enter(0.5)                                                  # x = 1000
+    model.move(-100, 0, now=1.0)                                      # not scaled for the right edge
+    assert model.move(1100, 0, now=1.1) is Exit.NONE                  # reaches the right edge
+    assert model.move(2, 0, now=1.2) is Exit.AFTER                    # minimum margin: 1 count
+    assert model.margin_counts == 100                                 # the return keeps its own margin
+
+
 def test_moves_along_the_edge_are_not_scaled():
     model = PointerModel(CAL, Side.TOP, away_factor=3.0)
     model.enter(0.5)
