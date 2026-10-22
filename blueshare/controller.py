@@ -32,7 +32,6 @@ LED_CAPS_LOCK = 0x02
 CTRL_BITS = 0x01 | 0x10
 VK_C, VK_V, VK_X = 0x43, 0x56, 0x58
 PASTE_LIMIT = 5000
-TYPE_GAP_S = 0.012  # pause after each pasted report: ~40 characters per second, no dropped packets
 # typed directly instead of through the layout table: Shift+Enter is a line break that does not send chats
 TYPED_CONTROLS = {"\n": (0x28, 0x02), "\t": (0x2B, 0), " ": (0x2C, 0), "\u00a0": (0x2C, 0)}
 SHORTCUT_BITS = 0x01 | 0x10 | 0x04 | 0x08 | 0x80  # Ctrl, left Alt, Win: the key is part of a shortcut
@@ -297,23 +296,30 @@ class Controller:
         truncated = len(text) > PASTE_LIMIT
         text = text[:PASTE_LIMIT]
         typed = skipped = 0
+        gap = max(0.002, self.config.paste_gap_ms / 1000)
+        previous = None
         with self.lock:
-            self.link.send_typed(bytes(8), TYPE_GAP_S)  # release everything held on the tablet (Ctrl!)
+            self.link.send_typed(bytes(8), gap)  # release everything held on the tablet (Ctrl!)
             for ch in text:
                 hit = TYPED_CONTROLS.get(ch) or table.get(ch)
                 if hit is None:
                     skipped += 1
                     continue
                 usage, mods = hit
-                self.link.send_typed(bytes([mods, 0, usage, 0, 0, 0, 0, 0]), TYPE_GAP_S)
-                self.link.send_typed(bytes(8), TYPE_GAP_S)
+                # a report with a new key releases the previous one: one report per character,
+                # plus a release only between two presses of the same key ("ll", "ss")
+                if usage == previous:
+                    self.link.send_typed(bytes(8), gap)
+                self.link.send_typed(bytes([mods, 0, usage, 0, 0, 0, 0, 0]), gap)
+                previous = usage
                 typed += 1
+            self.link.send_typed(bytes(8), gap)
             self.link.send_keyboard(self.keyboard.report())  # back to the keys physically held
             self._last_remote_input = self.clock()
         log.info("Pasting %d characters from the PC clipboard (%d skipped)", typed, skipped)
-        if typed > 200:
-            self.notify(f"Incollo {typed} caratteri: circa {round(typed * 2 * TYPE_GAP_S)} secondi. "
-                        "Esc per annullare.")
+        seconds = round(typed * gap)
+        if seconds >= 3:
+            self.notify(f"Incollo {typed} caratteri: circa {seconds} secondi. Esc per annullare.")
         if skipped or truncated:
             notes = []
             if skipped:

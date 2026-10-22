@@ -70,6 +70,7 @@ input for a while, BlueShare also dismisses a swipe lock screen (never a PIN or 
 | `side_exits` | `true` | leaving the tablet by a side edge goes to the monitor on that side of the PC screen (if there is one) |
 | `side_away_factor`, `side_margin` | `2.4`, `0.04` | like `away_factor` and `return_margin`, for the side edges |
 | `keyboard_layout` | `00000410` | Windows layout id matching the tablet's layout (Italian); `""` sends keys by physical position |
+| `paste_gap_ms` | `8` | pause after each character typed by Ctrl+V; raise it if pasted characters get lost |
 | `unlock_method` | `menu` | how to dismiss a swipe lock screen: `menu` (Menu key), `swipe` (mouse drag) or `none` |
 | `unlock_after_idle_s` | `30` | only unlock if the tablet received no input for this many seconds |
 

@@ -163,11 +163,12 @@ def test_ctrl_v_types_the_pc_clipboard(paste_env):
     assert press(ctl, KEY_V)
     assert reports(link) == [
         bytes(8),                                      # release Ctrl on the tablet first
-        key_report(0x04), bytes(8),                    # a
-        key_report(0x04, 0x02), bytes(8),              # A
-        key_report(0x2C), bytes(8),                    # space
-        key_report(0x33, 0x40), bytes(8),              # @ = AltGr + ò
-        key_report(0x28, 0x02), bytes(8),              # \r\n -> Shift+Enter (no chat send)
+        key_report(0x04),                              # a
+        bytes(8), key_report(0x04, 0x02),              # same key again: released in between, then A
+        key_report(0x2C),                              # space (a new key releases the previous one)
+        key_report(0x33, 0x40),                        # @ = AltGr + ò
+        key_report(0x28, 0x02),                        # \r\n -> Shift+Enter (no chat send)
+        bytes(8),                                      # release the last key
         bytes([0x01, 0, 0, 0, 0, 0, 0, 0]),            # back to Ctrl held
     ]
     assert notes == ["Incolla dal PC: 1 caratteri non presenti nel layout del tablet sono stati saltati."]
@@ -203,7 +204,7 @@ def test_spaces_are_typed_even_without_a_table_entry(paste_env):
     press(ctl, LCTRL)
     link.calls.clear()
     press(ctl, KEY_V)
-    assert reports(link)[1:7] == [key_report(0x04), bytes(8), key_report(0x2C), bytes(8), key_report(0x04), bytes(8)]
+    assert reports(link)[1:4] == [key_report(0x04), key_report(0x2C), key_report(0x04)]
 
 
 def test_after_a_tablet_copy_ctrl_v_is_the_tablets_own_paste(paste_env):
@@ -219,7 +220,7 @@ def test_after_a_tablet_copy_ctrl_v_is_the_tablets_own_paste(paste_env):
     ctl.clipboard.copy("a")                            # something new copied on the PC
     link.calls.clear()
     press(ctl, KEY_V)
-    assert reports(link)[:3] == [bytes(8), key_report(0x04), bytes(8)]
+    assert reports(link)[:2] == [bytes(8), key_report(0x04)]
 
 
 def test_ctrl_x_also_marks_a_tablet_copy(paste_env):
