@@ -9,6 +9,7 @@ from typing import Callable, Protocol
 
 from . import hid, keymap
 from .config import Config
+from .keyboard_layout import CAPS_LOCK_USAGE, CHAR_USAGES
 from .pointer import PIN_COUNTS, SETTLE_S, EdgePush, Exit, PointerModel, Side
 from .winput import (
     LLKHF_EXTENDED, LLKHF_INJECTED, LLMHF_INJECTED,
@@ -26,6 +27,8 @@ MAX_CALIBRATION_COUNTS = 30000
 SWEEP_STEP, SWEEP_INTERVAL_S = 2, 0.015  # ~130 counts/s: slow enough to click in time, and never accelerated
 WHEEL_DELTA = 120
 MENU_USAGE = 0x65           # Keyboard Application key: Android KEYCODE_MENU, dismisses a swipe lock screen
+SHIFT_BITS, ALTGR_BIT = 0x02 | 0x20, 0x40
+SHORTCUT_BITS = 0x01 | 0x10 | 0x04 | 0x08 | 0x80  # Ctrl, left Alt, Win: the key is part of a shortcut
 
 _BUTTONS = [
     (RI_MOUSE_LEFT_DOWN, RI_MOUSE_LEFT_UP, hid.MOUSE_LEFT),
@@ -64,6 +67,14 @@ class HidLink(Protocol):
 KeyId = tuple[int, bool]  # (scan code, extended)
 
 
+class Translator(Protocol):
+    @property
+    def active(self) -> bool: ...
+    def caps_lock_on(self) -> bool: ...
+    def translate(self, vk: int, scan: int, shift: bool, altgr: bool, caps: bool,
+                  shortcut: bool) -> tuple[int, int | None] | None: ...
+
+
 class Controller:
     def __init__(self, config: Config, link: HidLink, screen: Screen,
                  notify: Callable[[str], None], save_config: Callable[[], None],
@@ -90,6 +101,10 @@ class Controller:
         self.forwarded_keys: set[KeyId] = set()  # held on the tablet
         self.swallow_keys: set[KeyId] = set()    # key-ups that must reach nobody
         self.lctrl = self.lalt = False
+        # keyboard layout translation (None or inactive: keys are sent by physical position)
+        self.translator: Translator | None = None
+        self.translated: dict[KeyId, tuple[int, int | None]] = {}
+        self.caps = self.caps_held = False
         self._frac = [0.0, 0.0]
         self._wheel = [0, 0]
         self._last_offline_notice = -1e9
@@ -179,13 +194,55 @@ class Controller:
                 return True
 
             usage = keymap.hid_usage(vk, scan, key[1])
-            if usage is not None:
-                changed = self.keyboard.press(usage) if down else self.keyboard.release(usage)
-                (self.forwarded_keys.add if down else self.forwarded_keys.discard)(key)
-                if changed:
-                    self.link.send_keyboard(self.keyboard.report())
-                    self._last_remote_input = self.clock()
+            if usage is None:
+                return True
+            if self.translator is not None and self.translator.active:
+                if usage == CAPS_LOCK_USAGE:  # Caps Lock is applied while translating, never sent
+                    if down and not self.caps_held:
+                        self.caps = not self.caps
+                    self.caps_held = down
+                    return True
+                if down and key in self.translated:
+                    return True  # auto-repeat: the tablet repeats held keys itself
+                if not down and key in self.translated:
+                    self._release_translated(key)
+                    return True
+                if down and usage in CHAR_USAGES and self._press_translated(key, vk, scan & 0xFF):
+                    return True
+            changed = self.keyboard.press(usage) if down else self.keyboard.release(usage)
+            (self.forwarded_keys.add if down else self.forwarded_keys.discard)(key)
+            if changed:
+                self.link.send_keyboard(self.keyboard.report())
+                self._last_remote_input = self.clock()
             return True
+
+    def _press_translated(self, key: KeyId, vk: int, scan: int) -> bool:
+        mods = self.keyboard.modifiers
+        shortcut = bool(mods & SHORTCUT_BITS)
+        result = self.translator.translate(vk, scan, bool(mods & SHIFT_BITS), bool(mods & ALTGR_BIT),
+                                           self.caps, shortcut)
+        if result is None:
+            return False
+        usage, override = result
+        self.translated[key] = (usage, override)
+        self.forwarded_keys.add(key)
+        self.keyboard.press(usage)
+        self.keyboard.override = self._current_override()
+        self.link.send_keyboard(self.keyboard.report())
+        self._last_remote_input = self.clock()
+        return True
+
+    def _release_translated(self, key: KeyId) -> None:
+        usage, _ = self.translated.pop(key)
+        self.forwarded_keys.discard(key)
+        self.keyboard.release(usage)
+        self.keyboard.override = self._current_override()
+        self.link.send_keyboard(self.keyboard.report())
+
+    def _current_override(self) -> int | None:
+        """Modifiers of the most recently pressed translated key still held (None: physical ones)."""
+        overrides = [o for _, o in self.translated.values() if o is not None]
+        return overrides[-1] if overrides else None
 
     def on_connection_change(self, connected: bool) -> None:
         with self.lock:
@@ -384,6 +441,10 @@ class Controller:
         self.entry_monitor = mon
         self.cal_phase = 0
         self.keyboard.clear()
+        self.translated.clear()
+        self.caps_held = False
+        if mode is not Mode.LOCAL and self.translator is not None:
+            self.caps = self.translator.caps_lock_on()
         self.forwarded_keys.clear()
         self.ignored_buttons = self.phys_buttons
         self.edge.reset()

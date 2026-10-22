@@ -71,11 +71,18 @@ def system_report(bits: int = 0) -> bytes:
 
 
 class KeyboardState:
-    """Tracks pressed HID usages and builds 8-byte boot-compatible keyboard reports."""
+    """Tracks pressed HID usages and builds 8-byte boot-compatible keyboard reports.
+
+    ``override`` replaces the Shift and AltGr bits of the physical modifiers while a translated key
+    is held (e.g. Shift+2 typed as "@" on a US PC becomes AltGr+ò on an Italian tablet).
+    """
+
+    TRANSLATED_BITS = 0x02 | 0x20 | 0x40  # left Shift, right Shift, right Alt (AltGr)
 
     def __init__(self) -> None:
         self.modifiers = 0
         self.keys: list[int] = []
+        self.override: int | None = None
 
     def press(self, usage: int) -> bool:
         if 0xE0 <= usage <= 0xE7:
@@ -102,6 +109,10 @@ class KeyboardState:
     def clear(self) -> None:
         self.modifiers = 0
         self.keys.clear()
+        self.override = None
 
     def report(self) -> bytes:
-        return bytes([self.modifiers, 0] + self.keys + [0] * (KEYBOARD_ROLLOVER - len(self.keys)))
+        mods = self.modifiers
+        if self.override is not None:
+            mods = mods & ~self.TRANSLATED_BITS | self.override
+        return bytes([mods, 0] + self.keys + [0] * (KEYBOARD_ROLLOVER - len(self.keys)))

@@ -12,8 +12,8 @@ from PIL import Image, ImageDraw
 log = logging.getLogger(__name__)
 
 _COLORS = {"offline": (128, 128, 128), "local": (0, 120, 215), "remote": (16, 160, 80)}
-MAX_PRESETS = 6       # entries per submenu; unused ones are hidden
-MAX_PRESET_MENUS = 3  # preset submenus; unused ones are hidden
+MAX_PRESETS = 8       # entries per submenu; unused ones are hidden
+MAX_PRESET_MENUS = 4  # preset submenus; unused ones are hidden
 
 
 def _icon_image(state: str) -> Image.Image:

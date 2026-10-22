@@ -11,6 +11,7 @@ from pathlib import Path
 from . import __version__
 from .config import APP_DIR, CONFIG_PATH, Config
 from .controller import Controller, Mode
+from .keyboard_layout import LAYOUTS, LayoutTranslator
 from .tray import PresetMenu, Tray
 from .winput import InputThread, WindowsScreen, acquire_single_instance, enable_dpi_awareness
 
@@ -40,6 +41,8 @@ ENTRY_PRESETS = {
 
 # Passaggio ai monitor laterali: same levels as the return (applied to the tablet's side edges), or off.
 SIDE_OFF = "Disattivato"
+# Layout tastiera del tablet: the layout set on Android for the BlueShare keyboard, or no translation.
+BY_POSITION = "Posizione fisica (non tradurre)"
 
 
 def _setup_logging() -> None:
@@ -84,6 +87,8 @@ def main() -> int:
     ble = BleHidDevice(config.trusted_host_id, on_trusted_host=on_trusted_host,
                        on_connection_change=lambda c: controller and controller.on_connection_change(c))
     controller = Controller(config, ble, WindowsScreen(), notify=tray.notify, save_config=save_config)
+    translator = LayoutTranslator(config.keyboard_layout)
+    controller.translator = translator
     input_thread = InputThread(controller.on_raw_mouse, controller.on_key, controller.on_mouse_hook)
 
     def status() -> tuple[str, str, bool]:
@@ -132,6 +137,14 @@ def main() -> int:
             return SIDE_OFF
         return next((n for n, v in RETURN_PRESETS.items() if v == (config.side_away_factor, config.side_margin)), "")
 
+    def set_layout(name: str) -> None:
+        config.keyboard_layout = LAYOUTS.get(name, "")
+        with controller.lock:
+            translator.set_target(config.keyboard_layout)
+        save_config()
+        log.info("Tablet keyboard layout: %s", name)
+        tray.refresh()
+
     tray.preset_menus = [
         PresetMenu("Passaggio al tablet", list(ENTRY_PRESETS),
                    lambda: next((n for n, v in ENTRY_PRESETS.items()
@@ -142,6 +155,9 @@ def main() -> int:
                                  if v == (config.away_factor, config.return_margin)), ""),
                    set_return),
         PresetMenu("Passaggio ai monitor laterali", [*RETURN_PRESETS, SIDE_OFF], current_side, set_side),
+        PresetMenu("Layout tastiera del tablet", [*LAYOUTS, BY_POSITION],
+                   lambda: next((n for n, k in LAYOUTS.items() if k == config.keyboard_layout), BY_POSITION),
+                   set_layout),
     ]
     controller.on_state_change = tray.refresh
 

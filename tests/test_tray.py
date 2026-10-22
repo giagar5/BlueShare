@@ -30,3 +30,11 @@ def test_preset_submenus_show_names_check_current_and_select():
 def test_unused_preset_slots_are_hidden():
     tray = Tray()
     assert [i for i in _visible(tray.icon.menu) if i.submenu] == []
+
+
+def test_seven_entries_fit_in_a_submenu():
+    tray = Tray()
+    names = [f"L{i}" for i in range(7)]
+    tray.preset_menus = [PresetMenu("Layout", names, lambda: "L6", lambda n: None)]
+    sub = [i for i in _visible(tray.icon.menu) if i.submenu][0].submenu
+    assert [i.text for i in _visible(sub)] == names

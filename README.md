@@ -29,11 +29,12 @@ uv run blueshare
 1. Start BlueShare: an icon appears in the notification area.
 2. On the tablet open **Settings › Connected devices › Pair new device** and pick your PC.
    The first device that pairs becomes the *trusted* tablet: input reports are sent only to it.
-3. Set the tablet's physical keyboard layout to the one you use on Windows
-   (Settings › System › Keyboard › Physical keyboard). Keys are sent by physical position.
 4. Push the cursor past the top edge of the screen. The first time, an automatic calibration starts:
    the tablet cursor moves slowly down by itself; click (or press Enter) as soon as it touches the
    bottom edge, then again when it touches the right edge.
+5. In the tray menu › *Layout tastiera del tablet* pick the layout the tablet uses for the BlueShare
+   keyboard (Settings › System › Keyboard › Physical keyboard; Italian by default). BlueShare then
+   translates every key so that you type with the layout active on the PC, whatever the tablet uses.
 
 ## Usage
 
@@ -67,6 +68,7 @@ input for a while, BlueShare also dismisses a swipe lock screen (never a PIN or 
 | `wake_on_enter` | `true` | send a wake-up key when switching to the tablet |
 | `side_exits` | `true` | leaving the tablet by a side edge goes to the monitor on that side of the PC screen (if there is one) |
 | `side_away_factor`, `side_margin` | `2.4`, `0.04` | like `away_factor` and `return_margin`, for the side edges |
+| `keyboard_layout` | `00000410` | Windows layout id matching the tablet's layout (Italian); `""` sends keys by physical position |
 | `unlock_method` | `menu` | how to dismiss a swipe lock screen: `menu` (Menu key), `swipe` (mouse drag) or `none` |
 | `unlock_after_idle_s` | `30` | only unlock if the tablet received no input for this many seconds |
 
@@ -83,6 +85,11 @@ Logs: `%LOCALAPPDATA%\BlueShare\blueshare.log`.
   the matching point of the edge (with pauses, so Android does not accelerate those jumps), then
   follows the counts it sends, clamping at the borders like Android does. It keeps a separate
   pessimistic estimate for each exit edge: the one facing the PC and the two side edges.
+- `keyboard_layout.py` makes the PC layout win: for every key it asks Windows which character the
+  layout of the foreground window types (so switching layouts with Win+Space just works), and sends
+  the key and modifiers that type that character on the tablet's layout. Shortcuts keep the user's
+  modifiers; Caps Lock is applied on the PC side. Characters missing from the tablet layout (`~` and
+  `` ` `` on Italian) fall back to the physical key.
 - `ble.py` also watches the real Bluetooth link to the tablet: Windows does not always notice when
   the tablet drops the connection, and BlueShare would otherwise forward input into the void.
 
