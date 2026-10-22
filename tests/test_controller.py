@@ -19,6 +19,7 @@ class FakeLink:
     def send_system(self, report): self.calls.append(("sys", report))
     def send_typed(self, report, gap):
         self.calls.append(("kbd", report))
+        self.typed_gaps = getattr(self, "typed_gaps", []) + [gap]
         self.typed_pending = True
     def typing_pending(self): return getattr(self, "typed_pending", False)
     def cancel_typed(self):

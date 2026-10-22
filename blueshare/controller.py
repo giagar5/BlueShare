@@ -297,7 +297,6 @@ class Controller:
         text = text[:PASTE_LIMIT]
         typed = skipped = 0
         gap = max(0.002, self.config.paste_gap_ms / 1000)
-        previous = None
         with self.lock:
             self.link.send_typed(bytes(8), gap)  # release everything held on the tablet (Ctrl!)
             for ch in text:
@@ -306,14 +305,11 @@ class Controller:
                     skipped += 1
                     continue
                 usage, mods = hit
-                # a report with a new key releases the previous one: one report per character,
-                # plus a release only between two presses of the same key ("ll", "ss")
-                if usage == previous:
-                    self.link.send_typed(bytes(8), gap)
-                self.link.send_typed(bytes([mods, 0, usage, 0, 0, 0, 0, 0]), gap)
-                previous = usage
+                # press and release back to back, so they travel together: a key never stays held
+                # across a Bluetooth hiccup, which Android would auto-repeat ("platfform")
+                self.link.send_typed(bytes([mods, 0, usage, 0, 0, 0, 0, 0]), 0)
+                self.link.send_typed(bytes(8), gap)
                 typed += 1
-            self.link.send_typed(bytes(8), gap)
             self.link.send_keyboard(self.keyboard.report())  # back to the keys physically held
             self._last_remote_input = self.clock()
         log.info("Pasting %d characters from the PC clipboard (%d skipped)", typed, skipped)
