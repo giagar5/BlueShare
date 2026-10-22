@@ -206,6 +206,26 @@ def test_spaces_are_typed_even_without_a_table_entry(paste_env):
     assert reports(link)[1:7] == [key_report(0x04), bytes(8), key_report(0x2C), bytes(8), key_report(0x04), bytes(8)]
 
 
+@pytest.mark.parametrize("option,report", [
+    ("shift_enter", key_report(0x28, 0x02)),
+    ("enter", key_report(0x28)),
+    ("keypad_enter", key_report(0x58)),
+    ("alt_enter", key_report(0x28, 0x04)),
+    ("space", key_report(0x2C)),
+])
+def test_line_break_key_is_configurable_and_followed_by_a_pause(paste_env, option, report):
+    ctl, link, _ = paste_env
+    ctl.config.paste_newline = option
+    ctl.clipboard.copy("a\nA")
+    press(ctl, LCTRL)
+    link.calls.clear()
+    link.typed_gaps = []
+    press(ctl, KEY_V)
+    assert reports(link)[3] == report
+    gap = ctl.config.paste_gap_ms / 1000
+    assert link.typed_gaps[4] == pytest.approx(gap + 0.25)   # pause after the line break's release
+
+
 def test_pasted_keys_are_never_left_held_between_characters(paste_env):
     ctl, link, _ = paste_env
     ctl.clipboard.copy("aa")

@@ -29,6 +29,8 @@ class Config:
     wake_on_enter: bool = True
     keyboard_layout: str = "00000410"  # layout set on the tablet (Windows KLID); "" = send keys by position
     paste_gap_ms: float = 8          # pause after each pasted character; raise it if characters get lost
+    paste_newline: str = "shift_enter"  # how pasted line breaks are typed: shift_enter, enter, keypad_enter,
+                                        # alt_enter or space (joins the lines)
     side_exits: bool = True          # leaving the tablet by a side edge goes to the monitor on that side
     side_away_factor: float = 2.4    # like away_factor and return_margin, for the two side edges
     side_margin: float = 0.04

@@ -72,6 +72,7 @@ input for a while, BlueShare also dismisses a swipe lock screen (never a PIN or 
 | `side_away_factor`, `side_margin` | `2.4`, `0.04` | like `away_factor` and `return_margin`, for the side edges |
 | `keyboard_layout` | `00000410` | Windows layout id matching the tablet's layout (Italian); `""` sends keys by physical position |
 | `paste_gap_ms` | `8` | pause after each character typed by Ctrl+V (tray › *Velocità incolla*: 8 / 30 / 70); rich editors such as Teams drop keys typed too fast |
+| `paste_newline` | `shift_enter` | how pasted line breaks are typed (tray › *A capo nell'incolla*): `shift_enter`, `enter`, `keypad_enter`, `alt_enter`, or `space` to join the lines; apps disagree on which one is a plain line break |
 | `unlock_method` | `menu` | how to dismiss a swipe lock screen: `menu` (Menu key), `swipe` (mouse drag) or `none` |
 | `unlock_after_idle_s` | `30` | only unlock if the tablet received no input for this many seconds |
 
@@ -125,7 +126,8 @@ back before the cursor reaches the tablet edge after fast movements away from it
   to push further than usual. Recalibrate from the tray menu if it feels off.
 - Clipboard: PC → tablet works by typing (Ctrl+V on the tablet types the PC clipboard when it changed
   after the last Ctrl+C / Ctrl+X on the tablet; otherwise Ctrl+V is the tablet's own paste). Plain
-  text only: line breaks are typed as Shift+Enter, so chat apps do not send each line. Up to
+  text only: line breaks are typed as Shift+Enter by default (chat apps do not send each line), or as
+  another key chosen in the tray, followed by a short pause. Up to
   5000 characters; characters missing from the tablet layout are skipped. Tablet → PC is not
   possible: the tablet cannot send data back to a keyboard/mouse.
 - No automatic return when the tablet screen turns off: Android sends no

@@ -53,6 +53,15 @@ PASTE_PRESETS = {
     "Lento (Teams, Outlook, editor ricchi)": 70,
 }
 
+# A capo nell'incolla: menu label -> Config.paste_newline
+NEWLINE_PRESETS = {
+    "Maiusc+Invio": "shift_enter",
+    "Invio (attenzione: nelle chat invia)": "enter",
+    "Invio del tastierino": "keypad_enter",
+    "Alt+Invio": "alt_enter",
+    "Spazio (righe unite)": "space",
+}
+
 
 def _setup_logging() -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -163,6 +172,12 @@ def main() -> int:
         log.info("Paste speed: %s", name)
         tray.refresh()
 
+    def set_paste_newline(name: str) -> None:
+        config.paste_newline = NEWLINE_PRESETS[name]
+        save_config()
+        log.info("Paste line break: %s", config.paste_newline)
+        tray.refresh()
+
     tray.preset_menus = [
         PresetMenu("Passaggio al tablet", list(ENTRY_PRESETS),
                    lambda: next((n for n, v in ENTRY_PRESETS.items()
@@ -179,6 +194,9 @@ def main() -> int:
         PresetMenu("Velocità incolla", list(PASTE_PRESETS),
                    lambda: next((n for n, v in PASTE_PRESETS.items() if v == config.paste_gap_ms), ""),
                    set_paste_speed),
+        PresetMenu("A capo nell'incolla", list(NEWLINE_PRESETS),
+                   lambda: next((n for n, v in NEWLINE_PRESETS.items() if v == config.paste_newline), ""),
+                   set_paste_newline),
     ]
     controller.on_state_change = tray.refresh
 

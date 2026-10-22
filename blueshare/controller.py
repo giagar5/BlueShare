@@ -33,8 +33,18 @@ CTRL_BITS = 0x01 | 0x10
 VK_C, VK_V, VK_X = 0x43, 0x56, 0x58
 PASTE_LIMIT = 5000
 NOTIFY_TIME_S = 0.015  # measured: ~7 ms per notification, two per pasted character
-# typed directly instead of through the layout table: Shift+Enter is a line break that does not send chats
-TYPED_CONTROLS = {"\n": (0x28, 0x02), "\t": (0x2B, 0), " ": (0x2C, 0), "\u00a0": (0x2C, 0)}
+NEWLINE_PAUSE_S = 0.25  # rich editors (Teams) need a moment to open the new line
+# How a pasted line break is typed (tray › A capo nell'incolla): apps disagree on which one is a
+# plain line break; Enter sends chats, Shift+Enter makes Teams on Android leave the text box.
+NEWLINE_KEYS = {
+    "shift_enter": (0x28, 0x02),
+    "enter": (0x28, 0),
+    "keypad_enter": (0x58, 0),
+    "alt_enter": (0x28, 0x04),
+    "space": (0x2C, 0),
+}
+# typed directly instead of through the layout table (line breaks: see NEWLINE_KEYS)
+TYPED_CONTROLS = {"\t": (0x2B, 0), " ": (0x2C, 0), "\u00a0": (0x2C, 0)}
 SHORTCUT_BITS = 0x01 | 0x10 | 0x04 | 0x08 | 0x80  # Ctrl, left Alt, Win: the key is part of a shortcut
 
 _BUTTONS = [
@@ -298,10 +308,11 @@ class Controller:
         text = text[:PASTE_LIMIT]
         typed = skipped = 0
         gap = max(0.002, self.config.paste_gap_ms / 1000)
+        newline = NEWLINE_KEYS.get(self.config.paste_newline, NEWLINE_KEYS["shift_enter"])
         with self.lock:
             self.link.send_typed(bytes(8), gap)  # release everything held on the tablet (Ctrl!)
             for ch in text:
-                hit = TYPED_CONTROLS.get(ch) or table.get(ch)
+                hit = newline if ch == "\n" else TYPED_CONTROLS.get(ch) or table.get(ch)
                 if hit is None:
                     skipped += 1
                     continue
@@ -309,7 +320,7 @@ class Controller:
                 # press and release back to back, so they travel together: a key never stays held
                 # across a Bluetooth hiccup, which Android would auto-repeat ("platfform")
                 self.link.send_typed(bytes([mods, 0, usage, 0, 0, 0, 0, 0]), 0)
-                self.link.send_typed(bytes(8), gap)
+                self.link.send_typed(bytes(8), gap + (NEWLINE_PAUSE_S if ch == "\n" else 0))
                 typed += 1
             self.link.send_keyboard(self.keyboard.report())  # back to the keys physically held
             self._last_remote_input = self.clock()
