@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
+import time
 import uuid
 from collections import deque
 from typing import Callable
@@ -11,6 +12,7 @@ from typing import Callable
 from winrt.windows.devices.bluetooth import BluetoothConnectionStatus, BluetoothError, BluetoothLEDevice
 from winrt.windows.devices.bluetooth.genericattributeprofile import (
     GattCharacteristicProperties as Props,
+    GattCommunicationStatus,
     GattLocalCharacteristicParameters,
     GattLocalDescriptorParameters,
     GattProtectionLevel,
@@ -26,6 +28,7 @@ log = logging.getLogger(__name__)
 
 HID_SERVICE = 0x1812
 WATCHDOG_INTERVAL_S = 1.0
+NOTIFY_RETRIES, NOTIFY_RETRY_DELAY_S = 5, 0.02
 ADVERTISING_OK = ("STARTED", "STARTED_WITHOUT_ALL_ADVERTISEMENT_DATA")
 REPORT_REFERENCE = 0x2908
 INPUT_REPORT, OUTPUT_REPORT = 1, 2
@@ -80,6 +83,8 @@ class BleHidDevice:
         self._link_up = False
         self._sender: asyncio.Future | None = None
         self._watchdog_task: asyncio.Future | None = None
+        self._failed_notifies = 0
+        self._typed_stats = [0, 0.0]  # pasted reports sent, seconds spent waiting for Windows
 
     # ---- lifecycle -------------------------------------------------------------------------
 
@@ -197,8 +202,16 @@ class BleHidDevice:
                 if item[0] == "kbd":
                     await self._notify("keyboard_input", item[1])
                 elif item[0] == "typed":
+                    start = time.perf_counter()
                     await self._notify("keyboard_input", item[1])
+                    self._typed_stats[0] += 1
+                    self._typed_stats[1] += time.perf_counter() - start
                     await asyncio.sleep(item[2])
+                    if not self.typing_pending():
+                        count, busy = self._typed_stats
+                        log.info("Typed %d reports: %.1f ms per notification on average", count,
+                                 1000 * busy / max(1, count))
+                        self._typed_stats = [0, 0.0]
                 elif item[0] == "sys":
                     await self._notify("system_input", item[1])
                 elif item[0] == "pause":
@@ -214,20 +227,36 @@ class BleHidDevice:
             cy = max(-hid.AXIS_LIMIT, min(hid.AXIS_LIMIT, dy))
             cw = max(-hid.WHEEL_LIMIT, min(hid.WHEEL_LIMIT, wheel))
             ch = max(-hid.WHEEL_LIMIT, min(hid.WHEEL_LIMIT, hwheel))
-            await self._notify("mouse_input", hid.mouse_report(buttons, cx, cy, cw, ch))
+            await self._notify("mouse_input", hid.mouse_report(buttons, cx, cy, cw, ch), retries=2)
             dx, dy, wheel, hwheel = dx - cx, dy - cy, wheel - cw, hwheel - ch
             if not (dx or dy or wheel or hwheel):
                 return
 
-    async def _notify(self, name: str, data: bytes) -> None:
+    async def _notify(self, name: str, data: bytes, retries: int = NOTIFY_RETRIES) -> bool:
+        """Sends one report; retries when Windows reports it was not delivered.
+
+        Ignoring the result lost reports silently, and a lost key release leaves the key held on
+        the tablet, which Android then auto-repeats or combines (Ctrl+B, Ctrl+T...).
+        """
         self._values[name] = data
-        client = self._trusted_subscriber(self._chars[name])
-        if client is None:
-            return
-        try:
-            await self._chars[name].notify_value_for_subscribed_client_async(_to_buffer(data), client)
-        except Exception:
-            log.exception("notify %s failed", name)
+        for attempt in range(retries + 1):
+            client = self._trusted_subscriber(self._chars[name])
+            if client is None:
+                return False
+            try:
+                result = await self._chars[name].notify_value_for_subscribed_client_async(_to_buffer(data), client)
+                status = result.status
+            except Exception:
+                log.exception("notify %s failed", name)
+                status = None
+            if status == GattCommunicationStatus.SUCCESS:
+                return True
+            self._failed_notifies += 1
+            if self._failed_notifies <= 20 or self._failed_notifies % 100 == 0:
+                log.warning("notify %s not delivered (%s), attempt %d", name,
+                            getattr(status, "name", status), attempt + 1)
+            await asyncio.sleep(NOTIFY_RETRY_DELAY_S * (attempt + 1))
+        return False
 
     # ---- connection tracking -----------------------------------------------------------------
 
