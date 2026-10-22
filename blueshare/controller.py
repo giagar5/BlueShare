@@ -104,7 +104,6 @@ class Controller:
         # keyboard layout translation (None or inactive: keys are sent by physical position)
         self.translator: Translator | None = None
         self.translated: dict[KeyId, tuple[int, int | None]] = {}
-        self.caps = self.caps_held = False
         self._frac = [0.0, 0.0]
         self._wheel = [0, 0]
         self._last_offline_notice = -1e9
@@ -197,11 +196,10 @@ class Controller:
             if usage is None:
                 return True
             if self.translator is not None and self.translator.active:
-                if usage == CAPS_LOCK_USAGE:  # Caps Lock is applied while translating, never sent
-                    if down and not self.caps_held:
-                        self.caps = not self.caps
-                    self.caps_held = down
-                    return True
+                if usage == CAPS_LOCK_USAGE:
+                    # one Caps Lock state for PC and tablet: Windows toggles it (and the keyboard LED),
+                    # translation reads it; the tablet never gets the key
+                    return False
                 if down and key in self.translated:
                     return True  # auto-repeat: the tablet repeats held keys itself
                 if not down and key in self.translated:
@@ -220,7 +218,7 @@ class Controller:
         mods = self.keyboard.modifiers
         shortcut = bool(mods & SHORTCUT_BITS)
         result = self.translator.translate(vk, scan, bool(mods & SHIFT_BITS), bool(mods & ALTGR_BIT),
-                                           self.caps, shortcut)
+                                           self.translator.caps_lock_on(), shortcut)
         if result is None:
             return False
         usage, override = result
@@ -442,9 +440,6 @@ class Controller:
         self.cal_phase = 0
         self.keyboard.clear()
         self.translated.clear()
-        self.caps_held = False
-        if mode is not Mode.LOCAL and self.translator is not None:
-            self.caps = self.translator.caps_lock_on()
         self.forwarded_keys.clear()
         self.ignored_buttons = self.phys_buttons
         self.edge.reset()

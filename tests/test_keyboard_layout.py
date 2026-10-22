@@ -88,14 +88,18 @@ def test_shortcuts_keep_the_users_modifiers(env):
     assert reports(link)[-1] == bytes([0x01, 0, 0x06, 0, 0, 0, 0, 0])
 
 
-def test_caps_lock_is_applied_on_the_pc_side_and_not_sent(env):
+def test_caps_lock_reaches_windows_and_its_state_drives_translation(env):
     ctl, link = env
-    press(ctl, CAPS)
-    press(ctl, CAPS)                                   # auto-repeat does not toggle again
-    press(ctl, CAPS, down=False)
-    assert reports(link) == []
+    assert not press(ctl, CAPS)                        # not suppressed: Windows toggles it and the LED
+    assert not press(ctl, CAPS, down=False)
+    assert reports(link) == []                         # the tablet never gets it
+    ctl.translator.caps_on = True                      # Windows' state after the toggle
     press(ctl, KEY_A)
     assert reports(link)[-1] == bytes([0x02, 0, 0x04, 0, 0, 0, 0, 0])
+    press(ctl, KEY_A, down=False)
+    ctl.translator.caps_on = False
+    press(ctl, KEY_A)
+    assert reports(link)[-1] == bytes([0, 0, 0x04, 0, 0, 0, 0, 0])
 
 
 def test_untranslatable_keys_fall_back_to_position(env):

@@ -88,7 +88,8 @@ Logs: `%LOCALAPPDATA%\BlueShare\blueshare.log`.
 - `keyboard_layout.py` makes the PC layout win: for every key it asks Windows which character the
   layout of the foreground window types (so switching layouts with Win+Space just works), and sends
   the key and modifiers that type that character on the tablet's layout. Shortcuts keep the user's
-  modifiers; Caps Lock is applied on the PC side. Characters missing from the tablet layout (`~` and
+  modifiers; Caps Lock goes to Windows (one state and LED for PC and tablet) and is applied by the
+  translation. Characters missing from the tablet layout (`~` and
   `` ` `` on Italian) fall back to the physical key.
 - `ble.py` also watches the real Bluetooth link to the tablet: Windows does not always notice when
   the tablet drops the connection, and BlueShare would otherwise forward input into the void.
