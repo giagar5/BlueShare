@@ -166,7 +166,7 @@ def test_ctrl_v_types_the_pc_clipboard(paste_env):
         key_report(0x04, 0x02), bytes(8),              # A
         key_report(0x2C), bytes(8),                    # space
         key_report(0x33, 0x40), bytes(8),              # @ = AltGr + ò
-        key_report(0x28), bytes(8),                    # \r\n -> Enter
+        key_report(0x28, 0x02), bytes(8),              # \r\n -> Shift+Enter (no chat send)
         bytes([0x01, 0, 0, 0, 0, 0, 0, 0]),            # back to Ctrl held
     ]
     assert notes == ["Incolla dal PC: 1 caratteri non presenti nel layout del tablet sono stati saltati."]

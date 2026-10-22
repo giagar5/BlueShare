@@ -32,7 +32,7 @@ LED_CAPS_LOCK = 0x02
 CTRL_BITS = 0x01 | 0x10
 VK_C, VK_V, VK_X = 0x43, 0x56, 0x58
 PASTE_LIMIT = 5000
-TYPED_CONTROLS = {"\n": (0x28, 0), "\t": (0x2B, 0)}  # Enter, Tab
+TYPED_CONTROLS = {"\n": (0x28, 0x02), "\t": (0x2B, 0)}  # Shift+Enter: a line break that does not send chats
 SHORTCUT_BITS = 0x01 | 0x10 | 0x04 | 0x08 | 0x80  # Ctrl, left Alt, Win: the key is part of a shortcut
 
 _BUTTONS = [

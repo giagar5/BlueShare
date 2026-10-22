@@ -122,7 +122,8 @@ back before the cursor reaches the tablet edge after fast movements away from it
 - The return to Windows is estimated: after large fast movements away from the edge you may need
   to push further than usual. Recalibrate from the tray menu if it feels off.
 - Clipboard: PC → tablet works by typing (Ctrl+V on the tablet types the PC clipboard when it changed
-  after the last Ctrl+C / Ctrl+X on the tablet; otherwise Ctrl+V is the tablet's own paste). Up to
+  after the last Ctrl+C / Ctrl+X on the tablet; otherwise Ctrl+V is the tablet's own paste). Plain
+  text only: line breaks are typed as Shift+Enter, so chat apps do not send each line. Up to
   5000 characters; characters missing from the tablet layout are skipped. Tablet → PC is not
   possible: the tablet cannot send data back to a keyboard/mouse.
 - No automatic return when the tablet screen turns off: Android sends no
