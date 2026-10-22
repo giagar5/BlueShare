@@ -32,7 +32,9 @@ LED_CAPS_LOCK = 0x02
 CTRL_BITS = 0x01 | 0x10
 VK_C, VK_V, VK_X = 0x43, 0x56, 0x58
 PASTE_LIMIT = 5000
-TYPED_CONTROLS = {"\n": (0x28, 0x02), "\t": (0x2B, 0)}  # Shift+Enter: a line break that does not send chats
+TYPE_GAP_S = 0.012  # pause after each pasted report: ~40 characters per second, no dropped packets
+# typed directly instead of through the layout table: Shift+Enter is a line break that does not send chats
+TYPED_CONTROLS = {"\n": (0x28, 0x02), "\t": (0x2B, 0), " ": (0x2C, 0), "\u00a0": (0x2C, 0)}
 SHORTCUT_BITS = 0x01 | 0x10 | 0x04 | 0x08 | 0x80  # Ctrl, left Alt, Win: the key is part of a shortcut
 
 _BUTTONS = [
@@ -62,6 +64,9 @@ class HidLink(Protocol):
     def connected(self) -> bool: ...
     def send_keyboard(self, report: bytes) -> None: ...
     def send_system(self, report: bytes) -> None: ...
+    def send_typed(self, report: bytes, gap: float) -> None: ...
+    def typing_pending(self) -> bool: ...
+    def cancel_typed(self) -> None: ...
     def move(self, dx: int, dy: int, wheel: int = 0, hwheel: int = 0) -> None: ...
     def move_exact(self, dx: int, dy: int, settle: float = 0.0, buttons: int | None = None) -> None: ...
     def pause(self, seconds: float) -> None: ...
@@ -212,6 +217,16 @@ class Controller:
                         self._calibration_mark()
                 return True
 
+            if vk == VK_ESCAPE and self.link.typing_pending():
+                if down:
+                    self.swallow_keys.add(key)
+                    self.link.cancel_typed()
+                    self.link.send_keyboard(bytes(8))
+                    self.link.send_keyboard(self.keyboard.report())
+                    log.info("Paste cancelled")
+                    self.notify("Incolla annullato.")
+                return True
+
             usage = keymap.hid_usage(vk, scan, key[1])
             if usage is None:
                 return True
@@ -258,6 +273,8 @@ class Controller:
             return False
         if key in self.paste_keys:
             return True  # auto-repeat: paste once
+        if self.link.typing_pending():
+            return True  # still typing the previous paste
         if self.clipboard.sequence() == self.tablet_copy_seq:
             return False  # the tablet copied last: its own paste
         if not self.clipboard.has_text():
@@ -281,18 +298,22 @@ class Controller:
         text = text[:PASTE_LIMIT]
         typed = skipped = 0
         with self.lock:
+            self.link.send_typed(bytes(8), TYPE_GAP_S)  # release everything held on the tablet (Ctrl!)
             for ch in text:
                 hit = TYPED_CONTROLS.get(ch) or table.get(ch)
                 if hit is None:
                     skipped += 1
                     continue
                 usage, mods = hit
-                self.link.send_keyboard(bytes([mods, 0, usage, 0, 0, 0, 0, 0]))
-                self.link.send_keyboard(bytes(8))
+                self.link.send_typed(bytes([mods, 0, usage, 0, 0, 0, 0, 0]), TYPE_GAP_S)
+                self.link.send_typed(bytes(8), TYPE_GAP_S)
                 typed += 1
             self.link.send_keyboard(self.keyboard.report())  # back to the keys physically held
             self._last_remote_input = self.clock()
-        log.info("Pasted %d characters from the PC clipboard (%d skipped)", typed, skipped)
+        log.info("Pasting %d characters from the PC clipboard (%d skipped)", typed, skipped)
+        if typed > 200:
+            self.notify(f"Incollo {typed} caratteri: circa {round(typed * 2 * TYPE_GAP_S)} secondi. "
+                        "Esc per annullare.")
         if skipped or truncated:
             notes = []
             if skipped:

@@ -162,6 +162,7 @@ def test_ctrl_v_types_the_pc_clipboard(paste_env):
     link.calls.clear()
     assert press(ctl, KEY_V)
     assert reports(link) == [
+        bytes(8),                                      # release Ctrl on the tablet first
         key_report(0x04), bytes(8),                    # a
         key_report(0x04, 0x02), bytes(8),              # A
         key_report(0x2C), bytes(8),                    # space
@@ -174,6 +175,35 @@ def test_ctrl_v_types_the_pc_clipboard(paste_env):
     assert press(ctl, KEY_V)                           # auto-repeat: pasted only once
     assert press(ctl, KEY_V, down=False)
     assert reports(link) == []
+    assert press(ctl, KEY_V)                           # still typing the previous paste: ignored
+    assert reports(link) == []
+    press(ctl, KEY_V, down=False)
+
+
+def test_escape_cancels_a_paste_in_progress(paste_env):
+    ctl, link, notes = paste_env
+    press(ctl, LCTRL)
+    press(ctl, KEY_V)
+    press(ctl, KEY_V, down=False)
+    press(ctl, LCTRL, down=False)
+    link.calls.clear()
+    assert press(ctl, (0x1B, 0x01))
+    assert ("cancel",) in link.calls and reports(link) == [bytes(8), bytes(8)]
+    assert notes[-1] == "Incolla annullato."
+    assert press(ctl, (0x1B, 0x01), down=False)        # its key-up reaches nobody
+    link.calls.clear()
+    assert press(ctl, (0x1B, 0x01))                    # nothing to cancel: a normal Esc
+    assert reports(link)[-1] == key_report(0x29)
+
+
+def test_spaces_are_typed_even_without_a_table_entry(paste_env):
+    ctl, link, _ = paste_env
+    ctl.translator.table = {"a": (0x04, 0)}
+    ctl.clipboard.copy("a a")
+    press(ctl, LCTRL)
+    link.calls.clear()
+    press(ctl, KEY_V)
+    assert reports(link)[1:7] == [key_report(0x04), bytes(8), key_report(0x2C), bytes(8), key_report(0x04), bytes(8)]
 
 
 def test_after_a_tablet_copy_ctrl_v_is_the_tablets_own_paste(paste_env):
@@ -189,7 +219,7 @@ def test_after_a_tablet_copy_ctrl_v_is_the_tablets_own_paste(paste_env):
     ctl.clipboard.copy("a")                            # something new copied on the PC
     link.calls.clear()
     press(ctl, KEY_V)
-    assert reports(link)[:2] == [key_report(0x04), bytes(8)]
+    assert reports(link)[:3] == [bytes(8), key_report(0x04), bytes(8)]
 
 
 def test_ctrl_x_also_marks_a_tablet_copy(paste_env):

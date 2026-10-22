@@ -17,6 +17,13 @@ class FakeLink:
 
     def send_keyboard(self, report): self.calls.append(("kbd", report))
     def send_system(self, report): self.calls.append(("sys", report))
+    def send_typed(self, report, gap):
+        self.calls.append(("kbd", report))
+        self.typed_pending = True
+    def typing_pending(self): return getattr(self, "typed_pending", False)
+    def cancel_typed(self):
+        self.typed_pending = False
+        self.calls.append(("cancel",))
     def move(self, dx, dy, wheel=0, hwheel=0):
         if dx or dy or wheel or hwheel:
             self.calls.append(("move", dx, dy, wheel, hwheel))
