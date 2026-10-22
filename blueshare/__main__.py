@@ -85,7 +85,8 @@ def main() -> int:
 
     controller: Controller | None = None
     ble = BleHidDevice(config.trusted_host_id, on_trusted_host=on_trusted_host,
-                       on_connection_change=lambda c: controller and controller.on_connection_change(c))
+                       on_connection_change=lambda c: controller and controller.on_connection_change(c),
+                       on_leds=lambda leds: controller and controller.on_tablet_leds(leds))
     controller = Controller(config, ble, WindowsScreen(), notify=tray.notify, save_config=save_config)
     translator = LayoutTranslator(config.keyboard_layout)
     controller.translator = translator
@@ -141,6 +142,7 @@ def main() -> int:
         config.keyboard_layout = LAYOUTS.get(name, "")
         with controller.lock:
             translator.set_target(config.keyboard_layout)
+            controller.sync_tablet_caps()
         save_config()
         log.info("Tablet keyboard layout: %s", name)
         tray.refresh()

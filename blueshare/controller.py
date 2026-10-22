@@ -28,6 +28,7 @@ SWEEP_STEP, SWEEP_INTERVAL_S = 2, 0.015  # ~130 counts/s: slow enough to click i
 WHEEL_DELTA = 120
 MENU_USAGE = 0x65           # Keyboard Application key: Android KEYCODE_MENU, dismisses a swipe lock screen
 SHIFT_BITS, ALTGR_BIT = 0x02 | 0x20, 0x40
+LED_CAPS_LOCK = 0x02
 SHORTCUT_BITS = 0x01 | 0x10 | 0x04 | 0x08 | 0x80  # Ctrl, left Alt, Win: the key is part of a shortcut
 
 _BUTTONS = [
@@ -104,6 +105,7 @@ class Controller:
         # keyboard layout translation (None or inactive: keys are sent by physical position)
         self.translator: Translator | None = None
         self.translated: dict[KeyId, tuple[int, int | None]] = {}
+        self.tablet_leds = 0
         self._frac = [0.0, 0.0]
         self._wheel = [0, 0]
         self._last_offline_notice = -1e9
@@ -247,7 +249,30 @@ class Controller:
             if not connected and self.mode is not Mode.LOCAL:
                 self._go_local()
             self.notify("Tablet connesso." if connected else "Tablet disconnesso.")
+            if connected:
+                self.sync_tablet_caps()
         self._changed()
+
+    def on_tablet_leds(self, leds: int) -> None:
+        """The tablet reports its keyboard LEDs; translation needs its own Caps Lock off."""
+        with self.lock:
+            self.tablet_leds = leds
+            self.sync_tablet_caps()
+
+    def sync_tablet_caps(self) -> None:
+        """While translating, letter case comes from the PC: turn the tablet's Caps Lock off.
+
+        Pressing Caps Lock toggles it; the tablet then reports its LEDs again without the bit.
+        """
+        with self.lock:
+            if self.translator is None or not self.translator.active or not self.tablet_leds & LED_CAPS_LOCK:
+                return
+            if not self.link.connected:
+                return  # retried when the tablet connects
+            log.info("Turning off the tablet's Caps Lock")
+            self.tablet_leds &= ~LED_CAPS_LOCK
+            self.link.send_keyboard(bytes([0, 0, CAPS_LOCK_USAGE, 0, 0, 0, 0, 0]))
+            self.link.send_keyboard(self.keyboard.report())
 
     # ---- commands (hotkey, tray) -------------------------------------------------------------
 

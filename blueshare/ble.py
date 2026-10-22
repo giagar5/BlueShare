@@ -60,10 +60,12 @@ class BleHidDevice:
 
     def __init__(self, trusted_host_id: str = "",
                  on_trusted_host: Callable[[str], None] | None = None,
-                 on_connection_change: Callable[[bool], None] | None = None) -> None:
+                 on_connection_change: Callable[[bool], None] | None = None,
+                 on_leds: Callable[[int], None] | None = None) -> None:
         self.trusted_host_id = trusted_host_id
         self.on_trusted_host = on_trusted_host
         self.on_connection_change = on_connection_change
+        self.on_leds = on_leds  # keyboard LED bits written by the tablet (0x02 = Caps Lock)
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._loop.run_forever, name="blueshare-ble", daemon=True)
         self._provider = None
@@ -359,6 +361,8 @@ class BleHidDevice:
                 if value != self._values.get(name):
                     log.info("Host wrote %s: %s", name, value.hex())
                 self._values[name] = value
+                if name == "keyboard_output" and value and self.on_leds:
+                    self.on_leds(value[0])
                 if request.option == GattWriteOption.WRITE_WITH_RESPONSE:
                     request.respond()
             except Exception:

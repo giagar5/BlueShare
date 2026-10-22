@@ -102,6 +102,29 @@ def test_caps_lock_reaches_windows_and_its_state_drives_translation(env):
     assert reports(link)[-1] == bytes([0, 0, 0x04, 0, 0, 0, 0, 0])
 
 
+def test_tablet_caps_lock_is_turned_off_while_translating(env):
+    ctl, link = env
+    ctl.on_tablet_leds(0x02)                           # the tablet reports Caps Lock on
+    assert reports(link) == [bytes([0, 0, 0x39, 0, 0, 0, 0, 0]), bytes(8)]
+    ctl.on_tablet_leds(0x00)                           # its answer after the toggle: nothing more
+    ctl.on_tablet_leds(0x01)                           # Num Lock only: left alone
+    assert len(reports(link)) == 2
+
+
+def test_tablet_caps_lock_is_left_alone_by_position_or_offline(env):
+    ctl, link = env
+    link.connected = False
+    ctl.on_tablet_leds(0x02)
+    assert reports(link) == []
+    link.connected = True
+    ctl.on_connection_change(True)                     # retried on connection
+    assert reports(link)[0] == bytes([0, 0, 0x39, 0, 0, 0, 0, 0])
+    link.calls.clear()
+    ctl.translator.active = False
+    ctl.on_tablet_leds(0x02)
+    assert reports(link) == []
+
+
 def test_untranslatable_keys_fall_back_to_position(env):
     ctl, link = env
     press(ctl, (0x51, 0x10))                           # Q: not in the fake table
