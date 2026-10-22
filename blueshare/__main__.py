@@ -9,6 +9,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from . import __version__
+from .clipboard import WindowsClipboard
 from .config import APP_DIR, CONFIG_PATH, Config
 from .controller import Controller, Mode
 from .keyboard_layout import LAYOUTS, LayoutTranslator
@@ -90,6 +91,7 @@ def main() -> int:
     controller = Controller(config, ble, WindowsScreen(), notify=tray.notify, save_config=save_config)
     translator = LayoutTranslator(config.keyboard_layout)
     controller.translator = translator
+    controller.clipboard = WindowsClipboard()
     input_thread = InputThread(controller.on_raw_mouse, controller.on_key, controller.on_mouse_hook)
 
     def status() -> tuple[str, str, bool]:

@@ -29,6 +29,10 @@ WHEEL_DELTA = 120
 MENU_USAGE = 0x65           # Keyboard Application key: Android KEYCODE_MENU, dismisses a swipe lock screen
 SHIFT_BITS, ALTGR_BIT = 0x02 | 0x20, 0x40
 LED_CAPS_LOCK = 0x02
+CTRL_BITS = 0x01 | 0x10
+VK_C, VK_V, VK_X = 0x43, 0x56, 0x58
+PASTE_LIMIT = 5000
+TYPED_CONTROLS = {"\n": (0x28, 0), "\t": (0x2B, 0)}  # Enter, Tab
 SHORTCUT_BITS = 0x01 | 0x10 | 0x04 | 0x08 | 0x80  # Ctrl, left Alt, Win: the key is part of a shortcut
 
 _BUTTONS = [
@@ -71,9 +75,17 @@ KeyId = tuple[int, bool]  # (scan code, extended)
 class Translator(Protocol):
     @property
     def active(self) -> bool: ...
+    @property
+    def table(self) -> dict[str, tuple[int, int]] | None: ...
     def caps_lock_on(self) -> bool: ...
     def translate(self, vk: int, scan: int, shift: bool, altgr: bool, caps: bool,
                   shortcut: bool) -> tuple[int, int | None] | None: ...
+
+
+class Clipboard(Protocol):
+    def sequence(self) -> int: ...
+    def has_text(self) -> bool: ...
+    def text(self) -> str | None: ...
 
 
 class Controller:
@@ -106,6 +118,12 @@ class Controller:
         self.translator: Translator | None = None
         self.translated: dict[KeyId, tuple[int, int | None]] = {}
         self.tablet_leds = 0
+        # PC clipboard pasted on the tablet with Ctrl+V
+        self.clipboard: Clipboard | None = None
+        self.tablet_copy_seq: int | None = None
+        self.paste_keys: set[KeyId] = set()
+        self.run_task: Callable[[Callable[[], None]], None] = (
+            lambda target: threading.Thread(target=target, name="blueshare-paste", daemon=True).start())
         self._frac = [0.0, 0.0]
         self._wheel = [0, 0]
         self._last_offline_notice = -1e9
@@ -202,6 +220,8 @@ class Controller:
                     # one Caps Lock state for PC and tablet: Windows toggles it (and the keyboard LED),
                     # translation reads it; the tablet never gets the key
                     return False
+                if self._clipboard_shortcut(key, vk, down):
+                    return True
                 if down and key in self.translated:
                     return True  # auto-repeat: the tablet repeats held keys itself
                 if not down and key in self.translated:
@@ -215,6 +235,71 @@ class Controller:
                 self.link.send_keyboard(self.keyboard.report())
                 self._last_remote_input = self.clock()
             return True
+
+    def _clipboard_shortcut(self, key: KeyId, vk: int, down: bool) -> bool:
+        """Ctrl+V on the tablet types the PC clipboard when it is newer than the last tablet copy.
+
+        The tablet clipboard cannot be read over Bluetooth, so "newer" is tracked by the PC
+        clipboard sequence number at the last Ctrl+C / Ctrl+X typed on the tablet. Returns True
+        when the key was consumed.
+        """
+        if not down and key in self.paste_keys:
+            self.paste_keys.discard(key)
+            return True
+        if self.clipboard is None or not down:
+            return False
+        mods = self.keyboard.modifiers
+        if not mods & CTRL_BITS or mods & (SHORTCUT_BITS & ~CTRL_BITS | ALTGR_BIT):
+            return False
+        if vk in (VK_C, VK_X):
+            self.tablet_copy_seq = self.clipboard.sequence()
+            return False
+        if vk != VK_V:
+            return False
+        if key in self.paste_keys:
+            return True  # auto-repeat: paste once
+        if self.clipboard.sequence() == self.tablet_copy_seq:
+            return False  # the tablet copied last: its own paste
+        if not self.clipboard.has_text():
+            return False
+        self.paste_keys.add(key)
+        self.run_task(self._paste_pc_clipboard)
+        return True
+
+    def _paste_pc_clipboard(self) -> None:
+        text = self.clipboard.text()  # may wait for another program: never inside the keyboard hook
+        if text:
+            self._type_text(text)
+
+    def _type_text(self, text: str) -> None:
+        """Types text on the tablet, one key press per character, with the tablet layout."""
+        table = self.translator.table if self.translator is not None else None
+        if not table:
+            return
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        truncated = len(text) > PASTE_LIMIT
+        text = text[:PASTE_LIMIT]
+        typed = skipped = 0
+        with self.lock:
+            for ch in text:
+                hit = TYPED_CONTROLS.get(ch) or table.get(ch)
+                if hit is None:
+                    skipped += 1
+                    continue
+                usage, mods = hit
+                self.link.send_keyboard(bytes([mods, 0, usage, 0, 0, 0, 0, 0]))
+                self.link.send_keyboard(bytes(8))
+                typed += 1
+            self.link.send_keyboard(self.keyboard.report())  # back to the keys physically held
+            self._last_remote_input = self.clock()
+        log.info("Pasted %d characters from the PC clipboard (%d skipped)", typed, skipped)
+        if skipped or truncated:
+            notes = []
+            if skipped:
+                notes.append(f"{skipped} caratteri non presenti nel layout del tablet sono stati saltati")
+            if truncated:
+                notes.append(f"incollati solo i primi {PASTE_LIMIT} caratteri")
+            self.notify("Incolla dal PC: " + "; ".join(notes) + ".")
 
     def _press_translated(self, key: KeyId, vk: int, scan: int) -> bool:
         mods = self.keyboard.modifiers
@@ -465,6 +550,7 @@ class Controller:
         self.cal_phase = 0
         self.keyboard.clear()
         self.translated.clear()
+        self.paste_keys.clear()
         self.forwarded_keys.clear()
         self.ignored_buttons = self.phys_buttons
         self.edge.reset()

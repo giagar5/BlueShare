@@ -20,6 +20,7 @@ CAPS = (0x14, 0x3A)
 class FakeTranslator:
     """US PC -> Italian tablet for a few keys."""
     active = True
+    table = {"a": (0x04, 0), "A": (0x04, 0x02), "@": (0x33, 0x40), " ": (0x2C, 0)}
 
     def __init__(self):
         self.caps_on = False
@@ -123,6 +124,91 @@ def test_tablet_caps_lock_is_left_alone_by_position_or_offline(env):
     ctl.translator.active = False
     ctl.on_tablet_leds(0x02)
     assert reports(link) == []
+
+
+class FakeClipboard:
+    def __init__(self, text="aA @\r\n~"):
+        self.seq, self.content = 1, text
+
+    def sequence(self): return self.seq
+    def has_text(self): return self.content is not None
+    def text(self): return self.content
+
+    def copy(self, text):
+        self.seq, self.content = self.seq + 1, text
+
+
+KEY_V = (0x56, 0x2F)
+KEY_X = (0x58, 0x2D)
+
+
+def key_report(usage, mods=0):
+    return bytes([mods, 0, usage, 0, 0, 0, 0, 0])
+
+
+@pytest.fixture
+def paste_env(env):
+    ctl, link = env
+    notes = []
+    ctl.notify = notes.append
+    ctl.clipboard = FakeClipboard()
+    ctl.run_task = lambda task: task()
+    return ctl, link, notes
+
+
+def test_ctrl_v_types_the_pc_clipboard(paste_env):
+    ctl, link, notes = paste_env
+    press(ctl, LCTRL)
+    link.calls.clear()
+    assert press(ctl, KEY_V)
+    assert reports(link) == [
+        key_report(0x04), bytes(8),                    # a
+        key_report(0x04, 0x02), bytes(8),              # A
+        key_report(0x2C), bytes(8),                    # space
+        key_report(0x33, 0x40), bytes(8),              # @ = AltGr + ò
+        key_report(0x28), bytes(8),                    # \r\n -> Enter
+        bytes([0x01, 0, 0, 0, 0, 0, 0, 0]),            # back to Ctrl held
+    ]
+    assert notes == ["Incolla dal PC: 1 caratteri non presenti nel layout del tablet sono stati saltati."]
+    link.calls.clear()
+    assert press(ctl, KEY_V)                           # auto-repeat: pasted only once
+    assert press(ctl, KEY_V, down=False)
+    assert reports(link) == []
+
+
+def test_after_a_tablet_copy_ctrl_v_is_the_tablets_own_paste(paste_env):
+    ctl, link, notes = paste_env
+    press(ctl, LCTRL)
+    press(ctl, KEY_C)                                  # copy on the tablet: forwarded
+    assert reports(link)[-1] == key_report(0x06, 0x01)
+    press(ctl, KEY_C, down=False)
+    link.calls.clear()
+    press(ctl, KEY_V)                                  # forwarded as Ctrl+V
+    assert reports(link) == [key_report(0x19, 0x01)]
+    press(ctl, KEY_V, down=False)
+    ctl.clipboard.copy("a")                            # something new copied on the PC
+    link.calls.clear()
+    press(ctl, KEY_V)
+    assert reports(link)[:2] == [key_report(0x04), bytes(8)]
+
+
+def test_ctrl_x_also_marks_a_tablet_copy(paste_env):
+    ctl, link, _ = paste_env
+    press(ctl, LCTRL)
+    press(ctl, KEY_X)
+    press(ctl, KEY_X, down=False)
+    link.calls.clear()
+    press(ctl, KEY_V)
+    assert reports(link) == [key_report(0x19, 0x01)]
+
+
+def test_no_text_on_the_pc_clipboard_keeps_the_tablet_paste(paste_env):
+    ctl, link, _ = paste_env
+    ctl.clipboard.content = None                       # e.g. an image
+    press(ctl, LCTRL)
+    link.calls.clear()
+    press(ctl, KEY_V)
+    assert reports(link) == [key_report(0x19, 0x01)]
 
 
 def test_untranslatable_keys_fall_back_to_position(env):

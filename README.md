@@ -44,6 +44,7 @@ uv run blueshare
 | Back to Windows | push the cursor past the tablet edge facing the PC |
 | Straight to a side monitor | push past the tablet's left/right edge: the cursor lands on the monitor on that side of the PC screen; tune or turn off in tray menu › *Passaggio ai monitor laterali* |
 | Switch manually | `Ctrl` + `Alt` + `S`, or the tray menu |
+| Paste PC text on the tablet | copy on the PC, then `Ctrl` + `V` on the tablet: BlueShare types the text (needs a tablet layout, not *Posizione fisica*) |
 | Go to the tablet more or less easily | tray menu › *Passaggio al tablet* |
 | Return sooner or later | tray menu › *Ritorno su Windows* |
 | Recalibrate, forget the tablet, quit | tray menu |
@@ -120,7 +121,11 @@ back before the cursor reaches the tablet edge after fast movements away from it
 
 - The return to Windows is estimated: after large fast movements away from the edge you may need
   to push further than usual. Recalibrate from the tray menu if it feels off.
-- No clipboard sharing and no automatic return when the tablet screen turns off: Android sends no
+- Clipboard: PC → tablet works by typing (Ctrl+V on the tablet types the PC clipboard when it changed
+  after the last Ctrl+C / Ctrl+X on the tablet; otherwise Ctrl+V is the tablet's own paste). Up to
+  5000 characters; characters missing from the tablet layout are skipped. Tablet → PC is not
+  possible: the tablet cannot send data back to a keyboard/mouse.
+- No automatic return when the tablet screen turns off: Android sends no
   signal to a Bluetooth keyboard/mouse when the screen turns off, and there is no other channel
   from the tablet back to the PC.
 - BlueShare cannot tell whether the tablet is locked; the unlock is only sent after a period of
