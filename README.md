@@ -66,6 +66,7 @@ input for a while, BlueShare also dismisses a swipe lock screen (never a PIN or 
 | `return_margin` | `0.04` | how far past the tablet edge (fraction of its size) you must push to come back; negative = come back that far *before* the edge |
 | `away_factor` | `2.4` | worst-case Android pointer acceleration assumed when estimating the return (see below) |
 | `calibration_reaction_s` | `0.25` | reaction time subtracted from the calibration (the click comes after the edge is reached) |
+| `exit_grace_s` | `0.5` | after entering the tablet no exit can trigger for this long (avoids bouncing back) |
 | `wake_on_enter` | `true` | send a wake-up key when switching to the tablet |
 | `side_exits` | `true` | leaving the tablet by a side edge goes to the monitor on that side of the PC screen (if there is one) |
 | `side_away_factor`, `side_margin` | `2.4`, `0.04` | like `away_factor` and `return_margin`, for the side edges |

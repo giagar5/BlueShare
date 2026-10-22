@@ -25,6 +25,7 @@ class Config:
                                      # negative: come back that far before reaching the edge
     away_factor: float = 2.4         # worst-case Android acceleration assumed for moves away from that edge
     calibration_reaction_s: float = 0.25  # typical delay between the cursor touching the edge and the click
+    exit_grace_s: float = 0.5        # after entering the tablet, no exit can trigger for this long
     wake_on_enter: bool = True
     keyboard_layout: str = "00000410"  # layout set on the tablet (Windows KLID); "" = send keys by position
     paste_gap_ms: float = 8          # pause after each pasted character; raise it if characters get lost

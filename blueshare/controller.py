@@ -505,6 +505,7 @@ class Controller:
         self._wake_and_unlock()
         for dx, dy, settle in self.model.enter(fraction):
             self.link.move_exact(dx, dy, settle)
+        self.model.arm_after(self.clock() + self.config.exit_grace_s)
         log.info("Switched to the tablet at %.2f along the edge", fraction)
         self._changed()
 

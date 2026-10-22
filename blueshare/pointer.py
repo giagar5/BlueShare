@@ -103,6 +103,12 @@ class PointerModel:
                 return_margin if side_margin is None else side_margin, overshoot_reset_s)
         self._before = _SideEdge(cross, False, *args)
         self._after = _SideEdge(cross, True, *args)
+        self.armed_at = float("-inf")  # exits are ignored before this time (see arm_after)
+
+    def arm_after(self, when: float) -> None:
+        """Ignores every exit until ``when``: right after entering, the hand's rebound from the
+        push (or a diagonal entry near a corner) must not bounce the cursor straight back out."""
+        self.armed_at = when
 
     @property
     def _cross(self) -> float:
@@ -174,7 +180,11 @@ class PointerModel:
         cross_delta = dx if self.side in (Side.TOP, Side.BOTTOM) else dy
         out_before = self._before.move(cross_delta, now)
         out_after = self._after.move(cross_delta, now)
-        if self._return_move(dx, dy, now):
+        out_return = self._return_move(dx, dy, now)
+        if now < self.armed_at:
+            self.overshoot = self._before.overshoot = self._after.overshoot = 0.0
+            return Exit.NONE
+        if out_return:
             return Exit.RETURN
         if self.exit_before and out_before:
             return Exit.BEFORE

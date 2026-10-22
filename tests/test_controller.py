@@ -63,7 +63,7 @@ class Clock:
 @pytest.fixture
 def env():
     config = Config(calibration_width=2000, calibration_height=1000, entry_push_counts=150, return_margin=0.1,
-                    away_factor=3.0, side_margin=0.1, side_away_factor=3.0,
+                    away_factor=3.0, side_margin=0.1, side_away_factor=3.0, exit_grace_s=0.0,
                     unlock_method="none", calibration_reaction_s=0.0)
     link, screen, notes, saves = FakeLink(), FakeScreen(), [], []
     ctl = Controller(config, link, screen, notify=notes.append, save_config=lambda: saves.append(1), clock=Clock())
@@ -272,6 +272,19 @@ def test_disconnect_while_remote_returns_to_pc(env):
     push_up(ctl, screen)
     link.connected = False
     ctl.on_connection_change(False)
+    assert ctl.mode is Mode.LOCAL
+
+
+def test_no_exit_right_after_entering(env):
+    ctl, link, screen, *_ = env
+    ctl.config.exit_grace_s = 0.5
+    screen.monitors = [MON, Rect(-1920, 0, 0, 1080)]
+    push_up(ctl, screen)                              # enters 20 counts above the return edge
+    ctl.on_raw_mouse(raw(dy=500))                     # the hand's rebound: far past the return margin
+    ctl.on_raw_mouse(raw(dx=-5000))                   # and past the left edge
+    assert ctl.mode is Mode.REMOTE
+    ctl.clock.t += 0.5                                # grace over
+    ctl.on_raw_mouse(raw(dy=101))                     # the estimate sits on the bottom edge
     assert ctl.mode is Mode.LOCAL
 
 
