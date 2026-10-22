@@ -45,6 +45,14 @@ SIDE_OFF = "Disattivato"
 # Layout tastiera del tablet: the layout set on Android for the BlueShare keyboard, or no translation.
 BY_POSITION = "Posizione fisica (non tradurre)"
 
+# Velocità incolla: pause after each pasted character (ms). Rich editors such as Teams drop keys
+# that arrive too fast; plain text fields take the fastest level.
+PASTE_PRESETS = {
+    "Veloce (campi di testo semplici)": 8,
+    "Normale": 30,
+    "Lento (Teams, Outlook, editor ricchi)": 70,
+}
+
 
 def _setup_logging() -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -149,6 +157,12 @@ def main() -> int:
         log.info("Tablet keyboard layout: %s", name)
         tray.refresh()
 
+    def set_paste_speed(name: str) -> None:
+        config.paste_gap_ms = PASTE_PRESETS[name]
+        save_config()
+        log.info("Paste speed: %s", name)
+        tray.refresh()
+
     tray.preset_menus = [
         PresetMenu("Passaggio al tablet", list(ENTRY_PRESETS),
                    lambda: next((n for n, v in ENTRY_PRESETS.items()
@@ -162,6 +176,9 @@ def main() -> int:
         PresetMenu("Layout tastiera del tablet", [*LAYOUTS, BY_POSITION],
                    lambda: next((n for n, k in LAYOUTS.items() if k == config.keyboard_layout), BY_POSITION),
                    set_layout),
+        PresetMenu("Velocità incolla", list(PASTE_PRESETS),
+                   lambda: next((n for n, v in PASTE_PRESETS.items() if v == config.paste_gap_ms), ""),
+                   set_paste_speed),
     ]
     controller.on_state_change = tray.refresh
 
